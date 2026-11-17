@@ -10,7 +10,8 @@ const submissionSchema = z.object({
   transmission: z.enum(['Manual', 'Automatic']),
   mileage: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
   expectedPrice: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-  imageUrl: z.string().url().refine((value) => new URL(value).protocol === 'https:').optional(),
+  location: z.string().trim().min(1).max(150),
+  imageUrl: z.string().url().refine((value) => new URL(value).protocol === 'https:'),
   description: z.string().trim().max(3_000).optional(),
 }).strict();
 

@@ -159,6 +159,7 @@ test('submission endpoint validates input and returns the pending submission', a
       transmission: 'Automatic',
       mileage: 25_000,
       expectedPrice: 180_000_000,
+      location: 'Jakarta',
       imageUrl: 'https://images.example/car.jpg',
       description: 'Terawat',
     },
@@ -166,6 +167,8 @@ test('submission endpoint validates input and returns the pending submission', a
 
   assert.equal(response.status, 201);
   assert.equal(receivedInput.sellerName, 'Ayu');
+  assert.equal(receivedInput.location, 'Jakarta');
+  assert.equal(receivedInput.imageUrl, 'https://images.example/car.jpg');
   assert.equal(response.body.data.status, 'pending');
 });
 
@@ -189,10 +192,44 @@ test('submission endpoint rejects non-HTTPS image URLs and non-positive prices',
       transmission: 'Automatic',
       mileage: 25_000,
       expectedPrice: 0,
+      location: 'Jakarta',
       imageUrl: 'javascript:alert(1)',
     },
   });
 
   assert.equal(response.status, 422);
   assert.equal(response.body.error.code, 'VALIDATION_ERROR');
+});
+
+test('submission endpoint requires seller location and an HTTPS image URL', async () => {
+  const app = createTestApp({
+    submissionModel: {
+      async create() {
+        assert.fail('Submission missing required car data must not be stored');
+      },
+    },
+  });
+  const baseSubmission = {
+    sellerName: 'Ayu',
+    sellerPhone: '628123456789',
+    brand: 'Toyota',
+    model: 'Avanza',
+    year: 2020,
+    transmission: 'Automatic',
+    mileage: 25_000,
+    expectedPrice: 180_000_000,
+    imageUrl: 'https://images.example/car.jpg',
+  };
+
+  const missingLocation = await request(app, '/api/submissions', {
+    method: 'POST',
+    body: baseSubmission,
+  });
+  const missingImage = await request(app, '/api/submissions', {
+    method: 'POST',
+    body: { ...baseSubmission, location: 'Jakarta', imageUrl: undefined },
+  });
+
+  assert.equal(missingLocation.status, 422);
+  assert.equal(missingImage.status, 422);
 });

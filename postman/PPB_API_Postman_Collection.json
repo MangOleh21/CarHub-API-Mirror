@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "d4a0c40b-f37c-4c8a-894e-15b3beae3cc8",
     "name": "CarHub API",
-    "description": "Collection API CarHub untuk local/development. Login admin memakai cookie HttpOnly yang dikelola cookie jar Postman. Jalankan request berurutan; GET katalog mengisi carId dan POST pembuatan admin mengisi createdAdminId.",
+    "description": "Collection API CarHub untuk local/development. Login admin memakai cookie HttpOnly yang dikelola cookie jar Postman. Jalankan request berurutan; submission publik mengisi submissionId untuk diuji approval admin.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -125,7 +125,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sellerName\": \"Postman Tester\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"mileage\": 25000,\n  \"expectedPrice\": 180000000,\n  \"imageUrl\": \"https://images.example.test/carhub-postman-test.jpg\",\n  \"description\": \"Submission uji dari Postman; hapus atau moderasi data ini setelah pengujian.\"\n}",
+              "raw": "{\n  \"sellerName\": \"Postman Tester\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"mileage\": 25000,\n  \"expectedPrice\": 180000000,\n  \"location\": \"Jakarta\",\n  \"imageUrl\": \"https://images.example.test/carhub-postman-test.jpg\",\n  \"description\": \"Submission uji dari Postman; hapus atau moderasi data ini setelah pengujian.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -337,6 +337,98 @@
       ]
     },
     {
+      "name": "Admin submissions",
+      "description": "Login admin terlebih dahulu. Buat submission lewat Public API agar submissionId terisi, lalu gunakan approval satu kali.",
+      "item": [
+        {
+          "name": "List pending submissions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/submissions?status=pending&page=1&pageSize=20",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "submissions"],
+              "query": [
+                { "key": "status", "value": "pending" },
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns a paginated pending submission list', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "  pm.expect(body.pagination).to.include.all.keys('page', 'pageSize', 'totalItems', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve submission",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\",\n  \"location\": \"Jakarta\",\n  \"imageUrl\": \"https://images.example.test/carhub-postman-test.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/submissions/{{submissionId}}/status",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "submissions", "{{submissionId}}", "status"]
+            },
+            "description": "Mengubah submission pending menjadi approved dan membuat mobil katalog. Jalankan hanya sekali untuk submissionId yang dipilih."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('approves the submission and creates a catalog car', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.submission.status).to.eql('approved');",
+                  "  pm.expect(body.data.car).to.have.property('id');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Admin logout",
       "request": {
         "method": "POST",
@@ -377,7 +469,7 @@
     },
     {
       "key": "apiPort",
-      "value": "3000",
+      "value": "5000",
       "type": "string"
     },
     {
