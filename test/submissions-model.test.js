@@ -16,6 +16,8 @@ const submission = {
   location: null,
   description: 'Terawat',
   status: 'pending',
+  reviewedByEmail: null,
+  reviewNote: null,
 };
 
 function createPool(submissionRow) {
@@ -40,7 +42,12 @@ function createPool(submissionRow) {
       }
       if (statement.startsWith('UPDATE submissions')) {
         return {
-          rows: [{ id: submissionRow.id, status: values[0] }],
+          rows: [{
+            id: submissionRow.id,
+            status: values[0],
+            reviewedByEmail: values[1],
+            reviewNote: values[2],
+          }],
           rowCount: 1,
         };
       }
@@ -70,6 +77,8 @@ test('approval atomically creates a car and prefers seller data over admin fallb
 
   const result = await model.moderate('5', {
     status: 'approved',
+    reviewedByEmail: 'admin@example.test',
+    reviewNote: 'Review complete.',
     location: 'Jakarta',
     imageUrl: 'https://admin.example/car.jpg',
   });
@@ -83,7 +92,12 @@ test('approval atomically creates a car and prefers seller data over admin fallb
   const commitIndex = calls.findIndex(({ statement }) => statement === 'COMMIT');
   assert.deepEqual(result, {
     kind: 'updated',
-    submission: { id: '5', status: 'approved' },
+    submission: {
+      id: '5',
+      status: 'approved',
+      reviewedByEmail: 'admin@example.test',
+      reviewNote: 'Review complete.',
+    },
     car: { id: '91' },
   });
   assert.equal(insertCall.values[5], '180000000');
@@ -105,6 +119,7 @@ test('approval of legacy submission requires missing location or photo before cr
 
   const result = await model.moderate('5', {
     status: 'approved',
+    reviewedByEmail: 'admin@example.test',
     location: 'Jakarta',
   });
 
@@ -122,12 +137,15 @@ test('approval fills missing legacy submission fields from the admin payload', a
 
   const result = await model.moderate('5', {
     status: 'approved',
+    reviewedByEmail: 'admin@example.test',
     location: 'Jakarta',
     imageUrl: 'https://images.example/car.jpg',
   });
 
   const insertCall = calls.find(({ statement }) => statement.startsWith('INSERT INTO cars'));
   assert.equal(result.kind, 'updated');
+  assert.equal(result.submission.reviewedByEmail, 'admin@example.test');
+  assert.equal(result.submission.reviewNote, null);
   assert.equal(insertCall.values[6], 'https://images.example/car.jpg');
   assert.equal(insertCall.values[9], 'Jakarta');
 });
@@ -136,7 +154,10 @@ test('a submission that is no longer pending cannot create another catalog car',
   const { pool, calls } = createPool({ ...submission, status: 'approved' });
   const model = createSubmissionsModel(pool);
 
-  const result = await model.moderate('5', { status: 'approved' });
+  const result = await model.moderate('5', {
+    status: 'approved',
+    reviewedByEmail: 'admin@example.test',
+  });
 
   assert.deepEqual(result, { kind: 'not_pending', status: 'approved' });
   assert.equal(calls.some(({ statement }) => statement.startsWith('INSERT INTO cars')), false);
@@ -147,13 +168,55 @@ test('rejecting a submission updates its status without creating a catalog car',
   const { pool, calls } = createPool(submission);
   const model = createSubmissionsModel(pool);
 
-  const result = await model.moderate('5', { status: 'rejected' });
+  const result = await model.moderate('5', {
+    status: 'rejected',
+    reviewedByEmail: 'admin@example.test',
+  });
 
   assert.deepEqual(result, {
     kind: 'updated',
-    submission: { id: '5', status: 'rejected' },
+    submission: {
+      id: '5',
+      status: 'rejected',
+      reviewedByEmail: 'admin@example.test',
+      reviewNote: null,
+    },
     car: null,
   });
   assert.equal(calls.some(({ statement }) => statement.startsWith('INSERT INTO cars')), false);
   assert.equal(calls.at(-1).statement, 'COMMIT');
+});
+
+test('listing all submissions includes each status', async () => {
+  const submissions = [
+    { id: '8', status: 'pending' },
+    { id: '7', status: 'approved' },
+    { id: '6', status: 'rejected' },
+  ];
+  const pool = {
+    async query(sql, values) {
+      const filtersByStatus = sql.includes('WHERE status = $1');
+      const filtered = filtersByStatus
+        ? submissions.filter(({ status }) => status === values[0])
+        : submissions;
+
+      if (sql.includes('COUNT(*)')) {
+        return { rows: [{ count: String(filtered.length) }] };
+      }
+
+      const limitIndex = filtersByStatus ? 1 : 0;
+      const offsetIndex = limitIndex + 1;
+      return {
+        rows: filtered.slice(values[offsetIndex], values[offsetIndex] + values[limitIndex]),
+      };
+    },
+  };
+  const model = createSubmissionsModel(pool);
+
+  const result = await model.list({ status: 'all', limit: 20, offset: 0 });
+
+  assert.deepEqual(result, {
+    items: submissions,
+    totalItems: 3,
+  });
 });

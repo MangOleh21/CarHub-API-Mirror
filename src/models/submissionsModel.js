@@ -12,8 +12,23 @@ const submissionColumns = `
   location,
   description,
   status,
+  reviewed_by_email AS "reviewedByEmail",
+  review_note AS "reviewNote",
   created_at AS "createdAt"
 `;
+
+async function updateReview(client, id, input) {
+  const result = await client.query(
+    `UPDATE submissions
+     SET status = $1, reviewed_by_email = $2, review_note = $3
+     WHERE id = $4
+     RETURNING id::text AS id, status,
+               reviewed_by_email AS "reviewedByEmail",
+               review_note AS "reviewNote"`,
+    [input.status, input.reviewedByEmail, input.reviewNote ?? null, id],
+  );
+  return result.rows[0];
+}
 
 export function createSubmissionsModel(pool) {
   return {
@@ -53,17 +68,22 @@ export function createSubmissionsModel(pool) {
     },
 
     async list({ status, limit, offset }) {
+      const filters = status === 'all' ? [] : [status];
+      const whereClause = filters.length > 0 ? 'WHERE status = $1' : '';
       const countResult = await pool.query(
-        'SELECT COUNT(*)::text AS count FROM submissions WHERE status = $1',
-        [status],
+        `SELECT COUNT(*)::text AS count FROM submissions ${whereClause}`,
+        filters,
       );
+      const pageValues = [...filters, limit, offset];
+      const limitParameter = filters.length + 1;
+      const offsetParameter = filters.length + 2;
       const result = await pool.query(
         `SELECT ${submissionColumns}
          FROM submissions
-         WHERE status = $1
+         ${whereClause}
          ORDER BY created_at DESC, id DESC
-         LIMIT $2 OFFSET $3`,
-        [status, limit, offset],
+         LIMIT $${limitParameter} OFFSET $${offsetParameter}`,
+        pageValues,
       );
 
       return {
@@ -96,15 +116,9 @@ export function createSubmissionsModel(pool) {
         }
 
         if (input.status === 'rejected') {
-          const updated = await client.query(
-            `UPDATE submissions
-             SET status = $1
-             WHERE id = $2
-             RETURNING id::text AS id, status`,
-            ['rejected', id],
-          );
+          const updated = await updateReview(client, id, input);
           await client.query('COMMIT');
-          return { kind: 'updated', submission: updated.rows[0], car: null };
+          return { kind: 'updated', submission: updated, car: null };
         }
 
         const location = submission.location?.trim() || input.location;
@@ -148,18 +162,12 @@ export function createSubmissionsModel(pool) {
             submission.description,
           ],
         );
-        const updated = await client.query(
-          `UPDATE submissions
-           SET status = $1
-           WHERE id = $2
-           RETURNING id::text AS id, status`,
-          ['approved', id],
-        );
+        const updated = await updateReview(client, id, input);
 
         await client.query('COMMIT');
         return {
           kind: 'updated',
-          submission: updated.rows[0],
+          submission: updated,
           car: carResult.rows[0],
         };
       } catch (error) {

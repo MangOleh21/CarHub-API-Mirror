@@ -11,9 +11,15 @@ export function registerAdminSubmissionsRoutes(app, { submissionModel, adminMode
 
   app.get('/api/admin/submissions', requireAdmin, controller.list);
   app.patch(
-    '/api/admin/submissions/:id/status',
+    '/api/admin/submissions/:id/approved',
     requireTrustedOrigin,
     requireAdmin,
-    controller.moderate,
+    controller.approve,
+  );
+  app.patch(
+    '/api/admin/submissions/:id/rejected',
+    requireTrustedOrigin,
+    requireAdmin,
+    controller.reject,
   );
 }

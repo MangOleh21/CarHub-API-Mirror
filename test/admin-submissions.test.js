@@ -120,7 +120,45 @@ test('admin submission list defaults to pending and requires authentication', as
   }
 });
 
-test('admin can approve a submission and receive the created catalog car', async () => {
+test('admin can list submissions across all statuses', async () => {
+  let receivedFilters;
+  const items = [
+    { id: '8', status: 'pending' },
+    { id: '7', status: 'approved' },
+    { id: '6', status: 'rejected' },
+  ];
+  const client = await createClient({
+    submissionModel: {
+      async list(filters) {
+        receivedFilters = filters;
+        return { items, totalItems: items.length };
+      },
+    },
+  });
+
+  try {
+    const response = await client.request('/api/admin/submissions?status=all', {
+      cookie: sessionCookie,
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(receivedFilters, {
+      status: 'all',
+      limit: 20,
+      offset: 0,
+    });
+    assert.deepEqual(response.body.data.map(({ status }) => status), [
+      'pending',
+      'approved',
+      'rejected',
+    ]);
+    assert.equal(response.body.pagination.totalItems, 3);
+  } finally {
+    await client.close();
+  }
+});
+
+test('admin can approve a submission with a server-recorded reviewer and optional note', async () => {
   let moderation;
   const client = await createClient({
     submissionModel: {
@@ -128,7 +166,12 @@ test('admin can approve a submission and receive the created catalog car', async
         moderation = { id, ...input };
         return {
           kind: 'updated',
-          submission: { id, status: 'approved' },
+          submission: {
+            id,
+            status: 'approved',
+            reviewedByEmail: input.reviewedByEmail,
+            reviewNote: input.reviewNote,
+          },
           car: { id: '91' },
         };
       },
@@ -136,14 +179,14 @@ test('admin can approve a submission and receive the created catalog car', async
   });
 
   try {
-    const response = await client.request('/api/admin/submissions/8/status', {
+    const response = await client.request('/api/admin/submissions/8/approved', {
       method: 'PATCH',
       cookie: sessionCookie,
       origin,
       body: {
-        status: 'approved',
         location: 'Jakarta',
         imageUrl: 'https://images.example/car.jpg',
+        reviewNote: 'Dokumen dan kondisi kendaraan sudah diperiksa.',
       },
     });
 
@@ -151,11 +194,18 @@ test('admin can approve a submission and receive the created catalog car', async
     assert.deepEqual(moderation, {
       id: '8',
       status: 'approved',
+      reviewedByEmail: 'admin@example.test',
+      reviewNote: 'Dokumen dan kondisi kendaraan sudah diperiksa.',
       location: 'Jakarta',
       imageUrl: 'https://images.example/car.jpg',
     });
     assert.deepEqual(response.body.data, {
-      submission: { id: '8', status: 'approved' },
+      submission: {
+        id: '8',
+        status: 'approved',
+        reviewedByEmail: 'admin@example.test',
+        reviewNote: 'Dokumen dan kondisi kendaraan sudah diperiksa.',
+      },
       car: { id: '91' },
     });
   } finally {
@@ -163,7 +213,7 @@ test('admin can approve a submission and receive the created catalog car', async
   }
 });
 
-test('admin can reject a submission and cannot approve legacy data without required fields', async () => {
+test('admin can reject without a note and cannot approve legacy data without required fields', async () => {
   let receivedInput;
   const client = await createClient({
     submissionModel: {
@@ -172,7 +222,12 @@ test('admin can reject a submission and cannot approve legacy data without requi
         return input.status === 'rejected'
           ? {
               kind: 'updated',
-              submission: { id, status: 'rejected' },
+              submission: {
+                id,
+                status: 'rejected',
+                reviewedByEmail: input.reviewedByEmail,
+                reviewNote: input.reviewNote,
+              },
               car: null,
             }
           : { kind: 'missing_fields', fields: ['location', 'imageUrl'] };
@@ -181,36 +236,46 @@ test('admin can reject a submission and cannot approve legacy data without requi
   });
 
   try {
-    const rejected = await client.request('/api/admin/submissions/8/status', {
+    const rejected = await client.request('/api/admin/submissions/8/rejected', {
       method: 'PATCH',
       cookie: sessionCookie,
       origin,
-      body: { status: 'rejected' },
+      body: {},
     });
     assert.equal(rejected.status, 200);
     assert.deepEqual(rejected.body.data, {
-      submission: { id: '8', status: 'rejected' },
+      submission: {
+        id: '8',
+        status: 'rejected',
+        reviewedByEmail: 'admin@example.test',
+        reviewNote: null,
+      },
       car: null,
     });
 
-    const missingFields = await client.request('/api/admin/submissions/9/status', {
+    const missingFields = await client.request('/api/admin/submissions/9/approved', {
       method: 'PATCH',
       cookie: sessionCookie,
       origin,
-      body: { status: 'approved' },
+      body: {},
     });
     assert.equal(missingFields.status, 422);
     assert.equal(
       missingFields.body.error.code,
       'SUBMISSION_MISSING_REQUIRED_FIELDS',
     );
-    assert.deepEqual(receivedInput, { id: '9', status: 'approved' });
+    assert.deepEqual(receivedInput, {
+      id: '9',
+      status: 'approved',
+      reviewedByEmail: 'admin@example.test',
+      reviewNote: null,
+    });
   } finally {
     await client.close();
   }
 });
 
-test('admin cannot moderate from an untrusted origin or repeat a completed decision', async () => {
+test('admin cannot spoof reviewer email or repeat a decision, and the old status route is removed', async () => {
   let moderationCalls = 0;
   const client = await createClient({
     submissionModel: {
@@ -225,22 +290,37 @@ test('admin cannot moderate from an untrusted origin or repeat a completed decis
     const input = {
       method: 'PATCH',
       cookie: sessionCookie,
-      body: { status: 'rejected' },
+      body: {},
     };
-    const denied = await client.request('/api/admin/submissions/8/status', {
+    const spoofedReviewer = await client.request('/api/admin/submissions/8/approved', {
+      method: 'PATCH',
+      cookie: sessionCookie,
+      origin,
+      body: { reviewedByEmail: 'attacker@example.test' },
+    });
+    assert.equal(spoofedReviewer.status, 422);
+    assert.equal(moderationCalls, 0);
+
+    const denied = await client.request('/api/admin/submissions/8/rejected', {
       ...input,
       origin: 'https://attacker.example',
     });
     assert.equal(denied.status, 403);
     assert.equal(moderationCalls, 0);
 
-    const repeated = await client.request('/api/admin/submissions/8/status', {
+    const repeated = await client.request('/api/admin/submissions/8/approved', {
       ...input,
       origin,
     });
     assert.equal(repeated.status, 409);
     assert.equal(repeated.body.error.code, 'SUBMISSION_NOT_PENDING');
     assert.equal(moderationCalls, 1);
+
+    const oldRoute = await client.request('/api/admin/submissions/8/status', {
+      ...input,
+      origin,
+    });
+    assert.equal(oldRoute.status, 404);
   } finally {
     await client.close();
   }

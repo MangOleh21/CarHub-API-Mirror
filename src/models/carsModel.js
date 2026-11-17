@@ -57,5 +57,85 @@ export function createCarsModel(pool) {
       );
       return result.rows[0] ?? null;
     },
+
+    async create(input) {
+      const result = await pool.query(
+        `INSERT INTO cars (
+           brand,
+           model,
+           year,
+           transmission,
+           fuel_type,
+           mileage,
+           price,
+           image_url,
+           seller_name,
+           seller_phone,
+           location,
+           description
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         RETURNING ${carColumns}`,
+        [
+          input.brand,
+          input.model,
+          input.year,
+          input.transmission,
+          input.fuelType,
+          input.mileage,
+          input.price,
+          input.imageUrl,
+          input.sellerName,
+          input.sellerPhone,
+          input.location,
+          input.description,
+        ],
+      );
+      return result.rows[0];
+    },
+
+    async update(id, input) {
+      const result = await pool.query(
+        `UPDATE cars
+         SET brand = $1,
+             model = $2,
+             year = $3,
+             transmission = $4,
+             fuel_type = $5,
+             mileage = $6,
+             price = $7,
+             image_url = $8,
+             seller_name = $9,
+             seller_phone = $10,
+             location = $11,
+             description = $12
+         WHERE id = $13
+         RETURNING ${carColumns}`,
+        [
+          input.brand,
+          input.model,
+          input.year,
+          input.transmission,
+          input.fuelType,
+          input.mileage,
+          input.price,
+          input.imageUrl,
+          input.sellerName,
+          input.sellerPhone,
+          input.location,
+          input.description,
+          id,
+        ],
+      );
+      return result.rows[0] ?? null;
+    },
+
+    async deleteById(id) {
+      const result = await pool.query(
+        'DELETE FROM cars WHERE id = $1 RETURNING id::text AS id',
+        [id],
+      );
+      return result.rows[0] ?? null;
+    },
   };
 }

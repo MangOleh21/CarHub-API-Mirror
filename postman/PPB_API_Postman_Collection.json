@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "d4a0c40b-f37c-4c8a-894e-15b3beae3cc8",
     "name": "CarHub API",
-    "description": "Collection API CarHub untuk local/development. Login admin memakai cookie HttpOnly yang dikelola cookie jar Postman. Jalankan request berurutan; submission publik mengisi submissionId untuk diuji approval admin.",
+    "description": "Collection API CarHub untuk local/development. Login admin memakai cookie HttpOnly yang dikelola cookie jar Postman. Jalankan request berurutan; request Admin cars membuat lalu menghapus mobil uji.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -392,7 +392,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"approved\",\n  \"location\": \"Jakarta\",\n  \"imageUrl\": \"https://images.example.test/carhub-postman-test.jpg\"\n}",
+              "raw": "{\n  \"location\": \"Jakarta\",\n  \"imageUrl\": \"https://images.example.test/carhub-postman-test.jpg\",\n  \"reviewNote\": \"Data kendaraan telah diperiksa.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -400,13 +400,13 @@
               }
             },
             "url": {
-              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/submissions/{{submissionId}}/status",
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/submissions/{{submissionId}}/approved",
               "protocol": "http",
               "host": ["{{apiHost}}"],
               "port": "{{apiPort}}",
-              "path": ["api", "admin", "submissions", "{{submissionId}}", "status"]
+              "path": ["api", "admin", "submissions", "{{submissionId}}", "approved"]
             },
-            "description": "Mengubah submission pending menjadi approved dan membuat mobil katalog. Jalankan hanya sekali untuk submissionId yang dipilih."
+            "description": "Mengubah submission pending menjadi approved dan membuat mobil katalog. Email reviewer diambil dari sesi admin. Untuk menolak, gunakan /rejected dan kirim reviewNote opsional. Jalankan hanya sekali untuk submissionId yang dipilih."
           },
           "event": [
             {
@@ -419,8 +419,191 @@
                   "  const body = pm.response.json();",
                   "  pm.expect(body.success).to.eql(true);",
                   "  pm.expect(body.data.submission.status).to.eql('approved');",
+                  "  pm.expect(body.data.submission.reviewedByEmail).to.be.a('string');",
+                  "  pm.expect(body.data.submission.reviewNote).to.eql('Data kendaraan telah diperiksa.');",
                   "  pm.expect(body.data.car).to.have.property('id');",
                   "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin cars",
+      "description": "CRUD mobil oleh admin. Create, update, dan delete memakai adminCarId; delete adalah hard delete dan menghapus mobil uji yang dibuat oleh folder ini.",
+      "item": [
+        {
+          "name": "List admin cars",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/cars?page=1&pageSize=20",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "cars"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns a paginated admin car list', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "  pm.expect(body.pagination).to.include.all.keys('page', 'pageSize', 'totalItems', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create admin car",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"mileage\": 25000,\n  \"price\": 180000000,\n  \"imageUrl\": \"https://images.example.test/carhub-admin-test.jpg\",\n  \"sellerName\": \"Admin Test\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"location\": \"Jakarta\",\n  \"description\": \"Data uji CRUD admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/cars",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "cars"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('creates an admin car', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.collectionVariables.set('adminCarId', String(body.data.id));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get admin car",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/cars/{{adminCarId}}",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "cars", "{{adminCarId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns the created admin car', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get('adminCarId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update admin car",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza Veloz\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"mileage\": 25000,\n  \"price\": 185000000,\n  \"imageUrl\": \"https://images.example.test/carhub-admin-test.jpg\",\n  \"sellerName\": \"Admin Test\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"location\": \"Jakarta\",\n  \"description\": \"Data uji CRUD admin; sudah diperbarui\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/cars/{{adminCarId}}",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "cars", "{{adminCarId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('replaces the admin car', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().data.model).to.eql('Avanza Veloz');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete admin car",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/cars/{{adminCarId}}",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "cars", "{{adminCarId}}"]
+            },
+            "description": "Hard delete permanen mobil uji yang dibuat oleh request Create admin car."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('hard-deletes the admin car', function () {",
+                  "  pm.response.to.have.status(204);",
+                "});"
                 ]
               }
             }
@@ -484,6 +667,11 @@
     },
     {
       "key": "submissionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminCarId",
       "value": "",
       "type": "string"
     },

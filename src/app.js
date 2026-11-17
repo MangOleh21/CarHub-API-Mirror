@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { parseAllowedOrigins } from './config/origins.js';
 import { registerAdminAuthRoutes } from './routes/adminAuthRoutes.js';
+import { registerAdminCarsRoutes } from './routes/adminCarsRoutes.js';
 import { registerAdminSubmissionsRoutes } from './routes/adminSubmissionsRoutes.js';
 import { registerAdminUsersRoutes } from './routes/adminUsersRoutes.js';
 import { registerCarRoutes } from './routes/carsRoutes.js';
@@ -38,6 +39,7 @@ export function createApp({
   });
 
   registerCarRoutes(app, { carModel });
+  registerAdminCarsRoutes(app, { carModel, adminModel, allowedOrigins });
   registerSubmissionRoutes(app, { submissionModel });
   registerAdminAuthRoutes(app, { adminModel, allowedOrigins });
   registerAdminSubmissionsRoutes(app, { submissionModel, adminModel, allowedOrigins });

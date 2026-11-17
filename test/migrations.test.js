@@ -40,8 +40,11 @@ test('migration runner applies each numbered migration once in order', async () 
   assert.deepEqual([...appliedVersions], [
     '001_initial_schema',
     '002_add_submission_location',
+    '003_add_submission_review_details',
   ]);
-  assert.equal(firstRunSqlCount, 2);
+  assert.equal(firstRunSqlCount, 3);
   assert.equal(appliedSql.length, firstRunSqlCount);
   assert.match(appliedSql[1], /ALTER TABLE submissions ADD COLUMN location/);
+  assert.match(appliedSql[2], /ADD COLUMN reviewed_by_email/);
+  assert.match(appliedSql[2], /ADD COLUMN review_note/);
 });
