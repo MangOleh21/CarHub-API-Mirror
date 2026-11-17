@@ -5,9 +5,9 @@ import { createServer } from 'node:http';
 import { createApp } from '../src/app.js';
 
 const server = createServer(createApp({
-  carRepository: { async list() { return { items: [], totalItems: 0 }; }, async getById() { return null; } },
-  submissionRepository: { async create() { return null; } },
-  adminRepository: {
+  carModel: { async list() { return { items: [], totalItems: 0 }; }, async getById() { return null; } },
+  submissionModel: { async create() { return null; } },
+  adminModel: {
     async findUserByEmail() { return null; },
     async createSession() {},
     async getActiveSession() { return null; },

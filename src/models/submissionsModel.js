@@ -1,4 +1,4 @@
-export function createSubmissionRepository(pool) {
+export function createSubmissionsModel(pool) {
   return {
     async create(input) {
       const result = await pool.query(

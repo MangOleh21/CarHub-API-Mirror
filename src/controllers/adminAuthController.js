@@ -1,4 +1,3 @@
-import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import {
@@ -8,10 +7,6 @@ import {
   sessionCookieName,
   sessionDurationMs,
 } from '../auth/session-cookie.js';
-import {
-  createRequireAdmin,
-  createRequireTrustedOrigin,
-} from '../middleware/admin-auth.js';
 
 const loginSchema = z.object({
   email: z.string().trim().email().max(254),
@@ -38,34 +33,16 @@ function safeAdmin(admin) {
   };
 }
 
-export function registerAdminAuthRoutes(app, { adminRepository, allowedOrigins }) {
-  const requireAdmin = createRequireAdmin(adminRepository);
-  const requireTrustedOrigin = createRequireTrustedOrigin(allowedOrigins);
-  const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: (_request, response) => response.status(429).json({
-      error: {
-        code: 'RATE_LIMITED',
-        message: 'Too many login attempts; try again later',
-      },
-    }),
-  });
-
-  app.post(
-    '/api/admin/auth/login',
-    requireTrustedOrigin,
-    loginLimiter,
-    async (request, response) => {
+export function createAdminAuthController(adminModel) {
+  return {
+    login: async (request, response) => {
       const parsed = loginSchema.safeParse(request.body);
       if (!parsed.success) {
         return validationError(response, parsed.error);
       }
 
       const email = parsed.data.email.toLowerCase();
-      const admin = await adminRepository.findUserByEmail(email);
+      const admin = await adminModel.findUserByEmail(email);
       const passwordMatches = await verifyPassword(
         parsed.data.password,
         admin?.passwordHash ?? dummyPasswordHash,
@@ -81,10 +58,9 @@ export function registerAdminAuthRoutes(app, { adminRepository, allowedOrigins }
       }
 
       const token = createSessionToken();
-      const tokenHash = hashSessionToken(token);
-      await adminRepository.createSession({
+      await adminModel.createSession({
         adminUserId: admin.id,
-        tokenHash,
+        tokenHash: hashSessionToken(token),
         expiresAt: new Date(Date.now() + sessionDurationMs),
       });
 
@@ -94,24 +70,22 @@ export function registerAdminAuthRoutes(app, { adminRepository, allowedOrigins }
         data: { admin: safeAdmin(admin) },
       });
     },
-  );
 
-  app.get('/api/admin/auth/session', requireAdmin, (request, response) => {
-    return response.status(200).json({
-      success: true,
-      data: { admin: safeAdmin(request.admin) },
-    });
-  });
+    getSession: (request, response) => {
+      return response.status(200).json({
+        success: true,
+        data: { admin: safeAdmin(request.admin) },
+      });
+    },
 
-  app.post('/api/admin/auth/logout', requireTrustedOrigin, async (request, response) => {
-    const token = request.cookies[sessionCookieName];
-    if (token) {
-      await adminRepository.revokeSession(hashSessionToken(token));
-    }
+    logout: async (request, response) => {
+      const token = request.cookies[sessionCookieName];
+      if (token) {
+        await adminModel.revokeSession(hashSessionToken(token));
+      }
 
-    response.clearCookie(sessionCookieName, getSessionCookieOptions());
-    return response.status(204).end();
-  });
-
-  return { requireAdmin };
+      response.clearCookie(sessionCookieName, getSessionCookieOptions());
+      return response.status(204).end();
+    },
+  };
 }

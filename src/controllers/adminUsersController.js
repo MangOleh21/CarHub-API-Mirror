@@ -1,10 +1,5 @@
 import { z } from 'zod';
 import { hashPassword } from '../auth/password.js';
-import {
-  createRequireAdmin,
-  createRequireTrustedOrigin,
-  requireOwner,
-} from '../middleware/admin-auth.js';
 
 const createAdminSchema = z.object({
   email: z.string().trim().email().max(254),
@@ -24,16 +19,9 @@ function safeAdmin(admin) {
   };
 }
 
-export function registerAdminUserRoutes(app, { adminRepository, allowedOrigins }) {
-  const requireAdmin = createRequireAdmin(adminRepository);
-  const requireTrustedOrigin = createRequireTrustedOrigin(allowedOrigins);
-
-  app.post(
-    '/api/admin/users',
-    requireTrustedOrigin,
-    requireAdmin,
-    requireOwner,
-    async (request, response) => {
+export function createAdminUsersController(adminModel) {
+  return {
+    create: async (request, response) => {
       const parsed = createAdminSchema.safeParse(request.body);
       if (!parsed.success) {
         return response.status(422).json({
@@ -45,7 +33,7 @@ export function registerAdminUserRoutes(app, { adminRepository, allowedOrigins }
         });
       }
 
-      const admin = await adminRepository.createAdmin({
+      const admin = await adminModel.createAdmin({
         email: parsed.data.email.toLowerCase(),
         passwordHash: await hashPassword(parsed.data.password),
       });
@@ -64,14 +52,8 @@ export function registerAdminUserRoutes(app, { adminRepository, allowedOrigins }
         data: { admin: safeAdmin(admin) },
       });
     },
-  );
 
-  app.patch(
-    '/api/admin/users/:id/deactivate',
-    requireTrustedOrigin,
-    requireAdmin,
-    requireOwner,
-    async (request, response) => {
+    deactivate: async (request, response) => {
       const parsedId = adminIdSchema.safeParse(request.params.id);
       if (!parsedId.success) {
         return response.status(422).json({
@@ -82,7 +64,7 @@ export function registerAdminUserRoutes(app, { adminRepository, allowedOrigins }
         });
       }
 
-      const admin = await adminRepository.deactivateAdmin(parsedId.data);
+      const admin = await adminModel.deactivateAdmin(parsedId.data);
       if (!admin) {
         return response.status(404).json({
           error: {
@@ -97,5 +79,5 @@ export function registerAdminUserRoutes(app, { adminRepository, allowedOrigins }
         data: { admin: safeAdmin(admin) },
       });
     },
-  );
+  };
 }

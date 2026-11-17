@@ -1,9 +1,9 @@
 import 'dotenv/config';
 import { createApp } from './app.js';
-import { createPool } from './database/pool.js';
-import { createCarRepository } from './repositories/cars.js';
-import { createAdminRepository } from './repositories/admins.js';
-import { createSubmissionRepository } from './repositories/submissions.js';
+import { createPool } from './config/pool.js';
+import { createCarsModel } from './models/carsModel.js';
+import { createAdminsModel } from './models/adminsModel.js';
+import { createSubmissionsModel } from './models/submissionsModel.js';
 import { parseAllowedOrigins } from './config/origins.js';
 
 const port = Number(process.env.PORT ?? 5000);
@@ -14,9 +14,9 @@ if (!Number.isInteger(port) || port < 1 || port > 65_535) {
 
 const pool = createPool();
 const server = createApp({
-  carRepository: createCarRepository(pool),
-  submissionRepository: createSubmissionRepository(pool),
-  adminRepository: createAdminRepository(pool),
+  carModel: createCarsModel(pool),
+  submissionModel: createSubmissionsModel(pool),
+  adminModel: createAdminsModel(pool),
   allowedOrigins: parseAllowedOrigins(),
 }).listen(port, () => {
   console.log(`CarHub API listening on port ${port}`);

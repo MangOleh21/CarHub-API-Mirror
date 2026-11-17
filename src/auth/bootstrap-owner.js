@@ -8,13 +8,13 @@ const ownerInputSchema = z.object({
 
 export class BootstrapOwnerError extends Error {}
 
-export async function bootstrapOwner(adminRepository, input) {
+export async function bootstrapOwner(adminModel, input) {
   const parsed = ownerInputSchema.safeParse(input);
   if (!parsed.success) {
     throw new BootstrapOwnerError('Owner email or password does not meet the requirements');
   }
 
-  const owner = await adminRepository.createInitialOwner({
+  const owner = await adminModel.createInitialOwner({
     email: parsed.data.email.toLowerCase(),
     passwordHash: await hashPassword(parsed.data.password),
   });

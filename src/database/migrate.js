@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { createPool } from './pool.js';
+import { createPool } from '../config/pool.js';
 
 const migrationVersion = '001_initial_schema';
 const migrationPath = new URL('../../migrations/001_initial_schema.sql', import.meta.url);

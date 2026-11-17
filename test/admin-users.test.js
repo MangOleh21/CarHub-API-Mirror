@@ -39,14 +39,14 @@ async function createClient(app) {
   };
 }
 
-function createRepositories(adminRepository) {
+function createModels(adminModel) {
   return {
-    carRepository: {
+    carModel: {
       async list() { return { items: [], totalItems: 0 }; },
       async getById() { return null; },
     },
-    submissionRepository: { async create() { return null; } },
-    adminRepository,
+    submissionModel: { async create() { return null; } },
+    adminModel,
   };
 }
 
@@ -80,7 +80,7 @@ test('owner can create an admin without exposing its password hash', async () =>
       return { id: '2', email: input.email, role: 'admin', isActive: true };
     },
   };
-  const client = await createClient(createApp(createRepositories(adminRepository)));
+  const client = await createClient(createApp(createModels(adminRepository)));
 
   try {
     const cookie = await login(client);
@@ -134,7 +134,7 @@ test('admin role cannot create another admin', async () => {
     async getActiveSession() { return admin; },
     async createAdmin() { createCalls += 1; },
   };
-  const client = await createClient(createApp(createRepositories(adminRepository)));
+  const client = await createClient(createApp(createModels(adminRepository)));
 
   try {
     const cookie = await login(client, admin.email);
@@ -168,7 +168,7 @@ test('owner role cannot be requested in the admin creation payload', async () =>
     async getActiveSession() { return owner; },
     async createAdmin() { assert.fail('Unexpected owner role payload must be rejected'); },
   };
-  const client = await createClient(createApp(createRepositories(adminRepository)));
+  const client = await createClient(createApp(createModels(adminRepository)));
 
   try {
     const cookie = await login(client);
@@ -211,7 +211,7 @@ test('owner can deactivate an admin but the owner account cannot be deactivated'
         : null;
     },
   };
-  const client = await createClient(createApp(createRepositories(adminRepository)));
+  const client = await createClient(createApp(createModels(adminRepository)));
 
   try {
     const cookie = await login(client);

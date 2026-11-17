@@ -9,14 +9,14 @@ function unauthorized(response) {
   });
 }
 
-export function createRequireAdmin(adminRepository) {
+export function createRequireAdmin(adminModel) {
   return async (request, response, next) => {
     const token = request.cookies[sessionCookieName];
     if (!token) {
       return unauthorized(response);
     }
 
-    const admin = await adminRepository.getActiveSession(hashSessionToken(token));
+    const admin = await adminModel.getActiveSession(hashSessionToken(token));
     if (!admin) {
       return unauthorized(response);
     }

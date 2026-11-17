@@ -3,8 +3,8 @@ import readline from 'node:readline';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { bootstrapOwner, BootstrapOwnerError } from '../auth/bootstrap-owner.js';
-import { createPool } from '../database/pool.js';
-import { createAdminRepository } from '../repositories/admins.js';
+import { createPool } from '../config/pool.js';
+import { createAdminsModel } from '../models/adminsModel.js';
 
 function readHidden(prompt) {
   if (!stdin.isTTY || typeof stdin.setRawMode !== 'function') {
@@ -68,7 +68,7 @@ async function main() {
 
   const pool = createPool();
   try {
-    const owner = await bootstrapOwner(createAdminRepository(pool), { email, password });
+    const owner = await bootstrapOwner(createAdminsModel(pool), { email, password });
     console.log(`Created initial owner account ${owner.email} (id ${owner.id}).`);
   } catch (error) {
     if (error instanceof BootstrapOwnerError) {

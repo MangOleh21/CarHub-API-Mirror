@@ -35,16 +35,16 @@ async function request(app, path, options = {}) {
   }
 }
 
-function createRepositories(adminRepository) {
+function createModels(adminModel) {
   return {
-    carRepository: {
+    carModel: {
       async list() { return { items: [], totalItems: 0 }; },
       async getById() { return null; },
     },
-    submissionRepository: {
+    submissionModel: {
       async create() { return { id: '1', status: 'pending' }; },
     },
-    adminRepository,
+    adminModel,
   };
 }
 
@@ -71,7 +71,7 @@ test('admin can log in, inspect the session, and log out with an HttpOnly cookie
       sessionRevoked = true;
     },
   };
-  const app = createApp(createRepositories(adminRepository));
+  const app = createApp(createModels(adminRepository));
 
   const login = await request(app, '/api/admin/auth/login', {
     method: 'POST',
@@ -102,7 +102,7 @@ test('login uses one generic response for unknown emails and wrong passwords', a
     async findUserByEmail() { return null; },
     async createSession() { assert.fail('Invalid credentials must not create a session'); },
   };
-  const app = createApp(createRepositories(adminRepository));
+  const app = createApp(createModels(adminRepository));
 
   const response = await request(app, '/api/admin/auth/login', {
     method: 'POST',
@@ -119,7 +119,7 @@ test('login uses one generic response for unknown emails and wrong passwords', a
 });
 
 test('login rejects an untrusted browser origin', async () => {
-  const app = createApp(createRepositories({
+  const app = createApp(createModels({
     async findUserByEmail() { assert.fail('Untrusted origin must be rejected before lookup'); },
   }));
 

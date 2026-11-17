@@ -1,0 +1,27 @@
+import { createAdminUsersController } from '../controllers/adminUsersController.js';
+import {
+  createRequireAdmin,
+  createRequireTrustedOrigin,
+  requireOwner,
+} from '../middleware/admin-auth.js';
+
+export function registerAdminUsersRoutes(app, { adminModel, allowedOrigins }) {
+  const controller = createAdminUsersController(adminModel);
+  const requireAdmin = createRequireAdmin(adminModel);
+  const requireTrustedOrigin = createRequireTrustedOrigin(allowedOrigins);
+
+  app.post(
+    '/api/admin/users',
+    requireTrustedOrigin,
+    requireAdmin,
+    requireOwner,
+    controller.create,
+  );
+  app.patch(
+    '/api/admin/users/:id/deactivate',
+    requireTrustedOrigin,
+    requireAdmin,
+    requireOwner,
+    controller.deactivate,
+  );
+}

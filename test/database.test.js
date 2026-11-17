@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createPool } from '../src/database/pool.js';
+import { createPool } from '../src/config/pool.js';
 
 test('database pool requires a connection string', () => {
   assert.throws(

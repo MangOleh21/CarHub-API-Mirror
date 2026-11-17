@@ -1,4 +1,4 @@
-export function createAdminRepository(pool) {
+export function createAdminsModel(pool) {
   return {
     async findUserByEmail(email) {
       const result = await pool.query(

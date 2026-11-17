@@ -23,16 +23,16 @@ const car = {
 
 function createTestApp(options = {}) {
   return createApp({
-    carRepository: {
+    carModel: {
       async list() { return { items: [], totalItems: 0 }; },
       async getById() { return null; },
     },
-    submissionRepository: {
+    submissionModel: {
       async create() {
         return { id: '1', status: 'pending', createdAt: '2026-11-17T00:00:00.000Z' };
       },
     },
-    adminRepository: {
+    adminModel: {
       async findUserByEmail() { return null; },
       async createSession() {},
       async getActiveSession() { return null; },
@@ -68,7 +68,7 @@ async function request(app, path, options = {}) {
 test('car list validates filters and returns paginated results', async () => {
   let receivedFilters;
   const app = createTestApp({
-    carRepository: {
+    carModel: {
       async list(filters) {
         receivedFilters = filters;
         return { items: [car], totalItems: 11 };
@@ -102,7 +102,7 @@ test('car list validates filters and returns paginated results', async () => {
 
 test('car detail returns 404 when the repository has no matching car', async () => {
   const app = createTestApp({
-    carRepository: {
+    carModel: {
       async getById() {
         return null;
       },
@@ -120,7 +120,7 @@ test('car detail returns 404 when the repository has no matching car', async () 
 
 test('car list rejects out-of-range pagination', async () => {
   const app = createTestApp({
-    carRepository: {
+    carModel: {
       async list() {
         assert.fail('Invalid filters must not reach the repository');
       },
@@ -136,7 +136,7 @@ test('car list rejects out-of-range pagination', async () => {
 test('submission endpoint validates input and returns the pending submission', async () => {
   let receivedInput;
   const app = createTestApp({
-    submissionRepository: {
+    submissionModel: {
       async create(input) {
         receivedInput = input;
         return {
@@ -171,7 +171,7 @@ test('submission endpoint validates input and returns the pending submission', a
 
 test('submission endpoint rejects non-HTTPS image URLs and non-positive prices', async () => {
   const app = createTestApp({
-    submissionRepository: {
+    submissionModel: {
       async create() {
         assert.fail('Invalid submission must not reach the repository');
       },

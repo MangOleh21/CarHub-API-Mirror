@@ -15,7 +15,7 @@ const carColumns = `
   created_at AS "createdAt"
 `;
 
-export function createCarRepository(pool) {
+export function createCarsModel(pool) {
   return {
     async list({ search, brand, limit, offset }) {
       const filters = [];

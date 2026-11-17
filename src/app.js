@@ -3,21 +3,22 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import helmet from 'helmet';
 import { parseAllowedOrigins } from './config/origins.js';
-import { registerAdminAuthRoutes } from './routes/admin-auth.js';
-import { registerAdminUserRoutes } from './routes/admin-users.js';
-import { registerPublicRoutes } from './routes/public.js';
+import { registerAdminAuthRoutes } from './routes/adminAuthRoutes.js';
+import { registerAdminUsersRoutes } from './routes/adminUsersRoutes.js';
+import { registerCarRoutes } from './routes/carsRoutes.js';
+import { registerSubmissionRoutes } from './routes/submissionsRoutes.js';
 
 export function createApp({
-  carRepository,
-  submissionRepository,
-  adminRepository,
+  carModel,
+  submissionModel,
+  adminModel,
   allowedOrigins = parseAllowedOrigins(),
   logger = console,
 } = {}) {
   const app = express();
 
-  if (!carRepository || !submissionRepository || !adminRepository) {
-    throw new Error('Car, submission, and admin repositories are required');
+  if (!carModel || !submissionModel || !adminModel) {
+    throw new Error('Car, submission, and admin models are required');
   }
 
   app.disable('x-powered-by');
@@ -35,9 +36,10 @@ export function createApp({
     response.status(200).json({ status: 'ok' });
   });
 
-  registerPublicRoutes(app, { carRepository, submissionRepository });
-  registerAdminAuthRoutes(app, { adminRepository, allowedOrigins });
-  registerAdminUserRoutes(app, { adminRepository, allowedOrigins });
+  registerCarRoutes(app, { carModel });
+  registerSubmissionRoutes(app, { submissionModel });
+  registerAdminAuthRoutes(app, { adminModel, allowedOrigins });
+  registerAdminUsersRoutes(app, { adminModel, allowedOrigins });
 
   app.use((_request, response) => {
     response.status(404).json({
