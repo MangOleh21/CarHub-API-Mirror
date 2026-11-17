@@ -2,6 +2,8 @@
 
 REST API Express untuk CarHub PWA. Data disimpan di Neon PostgreSQL; fitur publik tidak memerlukan login, sedangkan portal admin memakai sesi berbasis cookie.
 
+Dibuat oleh Galileo Athari Muhammad (21120124130099) untuk Tugas Akhir Praktikum Pemrograman Perangkat Bergerak 2026.
+
 ## Setup lokal
 
 Persyaratan: Node.js 22+ dan npm.
@@ -47,7 +49,7 @@ Atur Root Directory proyek Vercel ke `backend/`. Express app diekspor dari `src/
 ## Endpoint
 
 Semua endpoint memakai prefix `/api`.
-Lihat [dokumentasi lengkap API](./docs/API.md) untuk skema request/response, validasi, autentikasi, dan contoh tiap endpoint.
+Lihat [dokumentasi lengkap API](./docs/API_DOCUMENTATION.md) untuk skema request/response, validasi, autentikasi, dan contoh tiap endpoint.
 
 ### Publik
 
