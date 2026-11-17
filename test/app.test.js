@@ -47,3 +47,54 @@ test('unknown routes return a safe, consistent 404 response', async () => {
     },
   });
 });
+
+test('database failures log a safe error code without exposing the message', async () => {
+  const logEntries = [];
+  const databaseError = Object.assign(new Error('do-not-log-this-detail'), {
+    code: '42P01',
+  });
+  const app = createApp({
+    carModel: {
+      async list() { throw databaseError; },
+      async getById() { return null; },
+    },
+    submissionModel: { async create() { return null; } },
+    adminModel: {
+      async findUserByEmail() { return null; },
+      async createSession() {},
+      async getActiveSession() { return null; },
+      async revokeSession() {},
+    },
+    logger: {
+      error(...entry) { logEntries.push(entry); },
+    },
+  });
+  const errorServer = createServer(app);
+  errorServer.listen(0, '127.0.0.1');
+  await once(errorServer, 'listening');
+  const address = errorServer.address();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/cars`);
+
+    assert.equal(response.status, 500);
+    assert.deepEqual(await response.json(), {
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'An unexpected error occurred',
+      },
+    });
+    assert.deepEqual(logEntries, [[
+      'API request failed',
+      {
+        path: '/api/cars',
+        errorName: 'Error',
+        errorCode: '42P01',
+      },
+    ]]);
+    assert.doesNotMatch(JSON.stringify(logEntries), /do-not-log-this-detail/);
+  } finally {
+    errorServer.close();
+    await once(errorServer, 'close');
+  }
+});

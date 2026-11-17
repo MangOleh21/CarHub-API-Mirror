@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "d4a0c40b-f37c-4c8a-894e-15b3beae3cc8",
     "name": "CarHub API",
-    "description": "Collection untuk API yang sudah tersedia. Gunakan hanya terhadap local/dev database. Login admin memakai cookie HttpOnly yang dikelola cookie jar Postman. Jalankan request berurutan; GET katalog mengisi carId dan POST pembuatan admin mengisi createdAdminId.",
+    "description": "Collection API CarHub untuk local/development. Login admin memakai cookie HttpOnly yang dikelola cookie jar Postman. Jalankan request berurutan; GET katalog mengisi carId dan POST pembuatan admin mengisi createdAdminId.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -15,7 +15,11 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/health"
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/health",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "health"]
             }
           },
           "event": [
@@ -41,10 +45,18 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/cars?page=1&pageSize=20"
-            },
-            "description": "Mengisi collection variable carId dengan ID mobil pertama jika katalog tidak kosong."
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/cars?page=1&pageSize=20",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "cars"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            }
           },
+          "description": "Mengisi collection variable carId dengan ID mobil pertama jika katalog tidak kosong.",
           "event": [
             {
               "listen": "test",
@@ -72,10 +84,14 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/cars/{{carId}}"
-            },
-            "description": "Memakai ID pertama dari request List cars. Jika katalog kosong, respons 404 tetap diterima."
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/cars/{{carId}}",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "cars", "{{carId}}"]
+            }
           },
+          "description": "Memakai ID pertama dari request List cars. Jika katalog kosong, respons 404 tetap diterima.",
           "event": [
             {
               "listen": "test",
@@ -117,7 +133,11 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/submissions"
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/submissions",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "submissions"]
             },
             "description": "Request ini menambahkan data submission berstatus pending ke database. Gunakan hanya pada local/dev."
           },
@@ -143,7 +163,7 @@
     },
     {
       "name": "Admin auth",
-      "description": "Isi adminEmail dan adminPassword pada environment. Login menetapkan cookie HttpOnly; Postman menyimpannya pada cookie jar untuk host baseUrl.",
+      "description": "Isi adminEmail dan adminPassword pada environment. Login menetapkan cookie HttpOnly; Postman menyimpannya pada cookie jar untuk host API.",
       "item": [
         {
           "name": "Admin login",
@@ -169,7 +189,11 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/admin/auth/login"
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/auth/login",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "auth", "login"]
             }
           },
           "event": [
@@ -196,7 +220,11 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/admin/auth/session"
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/auth/session",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "auth", "session"]
             }
           },
           "event": [
@@ -245,7 +273,11 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/admin/users"
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/users",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "users"]
             }
           },
           "event": [
@@ -278,7 +310,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/admin/users/{{createdAdminId}}/deactivate"
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/users/{{createdAdminId}}/deactivate",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "users", "{{createdAdminId}}", "deactivate"]
             }
           },
           "event": [
@@ -311,7 +347,11 @@
           }
         ],
         "url": {
-          "raw": "{{baseUrl}}/api/admin/auth/logout"
+          "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/auth/logout",
+          "protocol": "http",
+          "host": ["{{apiHost}}"],
+          "port": "{{apiPort}}",
+          "path": ["api", "admin", "auth", "logout"]
         }
       },
       "event": [
@@ -331,8 +371,13 @@
   ],
   "variable": [
     {
-      "key": "baseUrl",
-      "value": "http://localhost:5000",
+      "key": "apiHost",
+      "value": "localhost",
+      "type": "string"
+    },
+    {
+      "key": "apiPort",
+      "value": "3000",
       "type": "string"
     },
     {

@@ -73,9 +73,14 @@ export function createApp({
       });
     }
 
+    const errorCode = typeof error.code === 'string' && /^[A-Z0-9_]+$/.test(error.code)
+      ? error.code
+      : undefined;
+
     logger.error('API request failed', {
       path: request.path,
       errorName: error.name,
+      ...(errorCode ? { errorCode } : {}),
     });
     return response.status(500).json({
       error: {

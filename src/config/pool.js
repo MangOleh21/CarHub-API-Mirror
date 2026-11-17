@@ -1,6 +1,15 @@
 import pg from 'pg';
 
 const { Pool } = pg;
+const legacySslModes = new Set(['prefer', 'require', 'verify-ca']);
+
+export function normalizeSslMode(databaseUrl) {
+  const parsedUrl = new URL(databaseUrl);
+  if (legacySslModes.has(parsedUrl.searchParams.get('sslmode'))) {
+    parsedUrl.searchParams.set('sslmode', 'verify-full');
+  }
+  return parsedUrl.toString();
+}
 
 export function createPool(databaseUrl = process.env.DATABASE_URL) {
   if (!databaseUrl) {
@@ -19,7 +28,7 @@ export function createPool(databaseUrl = process.env.DATABASE_URL) {
   }
 
   return new Pool({
-    connectionString: databaseUrl,
+    connectionString: normalizeSslMode(databaseUrl),
     max: 5,
     connectionTimeoutMillis: 5_000,
     idleTimeoutMillis: 30_000,
