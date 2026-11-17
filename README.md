@@ -40,6 +40,10 @@ npm run dev
 | `npm run db:migrate` | Menerapkan migration yang belum tercatat ke `DATABASE_URL` |
 | `npm run admin:bootstrap` | Membuat owner pertama |
 
+## Deployment ke Vercel
+
+Atur Root Directory proyek Vercel ke `backend/`. Express app diekspor dari `src/app.js` sebagai handler default. Tambahkan `DATABASE_URL` dan `FRONTEND_ORIGINS` pada Environment Variables Vercel; jangan letakkan `DATABASE_URL` di frontend. Lihat [dokumentasi Express di Vercel](https://vercel.com/docs/frameworks/backend/express).
+
 ## Endpoint
 
 Semua endpoint memakai prefix `/api`.

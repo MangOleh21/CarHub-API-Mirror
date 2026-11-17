@@ -3,6 +3,10 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import helmet from 'helmet';
 import { parseAllowedOrigins } from './config/origins.js';
+import { createPool } from './config/pool.js';
+import { createAdminsModel } from './models/adminsModel.js';
+import { createCarsModel } from './models/carsModel.js';
+import { createSubmissionsModel } from './models/submissionsModel.js';
 import { registerAdminAuthRoutes } from './routes/adminAuthRoutes.js';
 import { registerAdminCarsRoutes } from './routes/adminCarsRoutes.js';
 import { registerAdminSubmissionsRoutes } from './routes/adminSubmissionsRoutes.js';
@@ -95,4 +99,20 @@ export function createApp({
   });
 
   return app;
+}
+
+let vercelApp;
+
+export default function vercelHandler(request, response) {
+  if (!vercelApp) {
+    const pool = createPool();
+    vercelApp = createApp({
+      carModel: createCarsModel(pool),
+      submissionModel: createSubmissionsModel(pool),
+      adminModel: createAdminsModel(pool),
+      allowedOrigins: parseAllowedOrigins(),
+    });
+  }
+
+  return vercelApp(request, response);
 }
