@@ -47,6 +47,7 @@ Atur Root Directory proyek Vercel ke `backend/`. Express app diekspor dari `src/
 ## Endpoint
 
 Semua endpoint memakai prefix `/api`.
+Lihat [dokumentasi lengkap API](./docs/API.md) untuk skema request/response, validasi, autentikasi, dan contoh tiap endpoint.
 
 ### Publik
 
