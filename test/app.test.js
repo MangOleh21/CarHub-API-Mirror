@@ -89,10 +89,54 @@ test('database failures log a safe error code without exposing the message', asy
       {
         path: '/api/cars',
         errorName: 'Error',
+        errorClass: 'Error',
         errorCode: '42P01',
       },
     ]]);
     assert.doesNotMatch(JSON.stringify(logEntries), /do-not-log-this-detail/);
+  } finally {
+    errorServer.close();
+    await once(errorServer, 'close');
+  }
+});
+
+test('image provider failures log their safe error class without exposing the message', async () => {
+  const logEntries = [];
+  class ImageProviderError extends Error {}
+  const app = createApp({
+    carModel: {
+      async list() { throw new ImageProviderError('Access denied'); },
+      async getById() { return null; },
+    },
+    submissionModel: { async create() { return null; } },
+    adminModel: {
+      async findUserByEmail() { return null; },
+      async createSession() {},
+      async getActiveSession() { return null; },
+      async revokeSession() {},
+    },
+    logger: {
+      error(...entry) { logEntries.push(entry); },
+    },
+  });
+  const errorServer = createServer(app);
+  errorServer.listen(0, '127.0.0.1');
+  await once(errorServer, 'listening');
+  const address = errorServer.address();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/cars`);
+
+    assert.equal(response.status, 500);
+    assert.deepEqual(logEntries, [[
+      'API request failed',
+      {
+        path: '/api/cars',
+        errorName: 'Error',
+        errorClass: 'ImageProviderError',
+      },
+    ]]);
+    assert.doesNotMatch(JSON.stringify(logEntries), /Access denied/);
   } finally {
     errorServer.close();
     await once(errorServer, 'close');

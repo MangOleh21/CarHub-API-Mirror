@@ -177,6 +177,52 @@ Body bersifat strict; field tambahan yang tidak dikenal akan ditolak.
 
 **Respons error:** `422 VALIDATION_ERROR` jika body tidak valid.
 
+### `POST /api/uploads/submissions`
+
+Meminta URL bertanda tangan dan field upload untuk mengirim satu foto pengajuan langsung ke Cloudinary. Request ini hanya membuat otorisasi upload; file tidak dikirim ke API. Kirim `Origin` yang termasuk dalam `FRONTEND_ORIGINS`. Endpoint ini dibatasi 10 kali per 15 menit per proses API.
+
+**Request body:**
+
+```json
+{
+  "contentType": "image/png",
+  "size": 1024
+}
+```
+
+`contentType` hanya menerima `image/jpeg`, `image/png`, atau `image/webp`. `size` adalah ukuran file dalam byte yang dilaporkan klien, dari 1 sampai 5.242.880 (5 MiB); endpoint menolak nilai di luar rentang tersebut. Karena file diunggah langsung ke Cloudinary, nilai `size` bukan bukti ukuran aktual dan tidak membatasi file yang dikirim ke Cloudinary. UI memvalidasi ukuran 5 MiB, tetapi batas keras tidak tersedia per upload preset Cloudinary.
+
+**Respons `200`:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "uploadUrl": "https://api.cloudinary.com/v1_1/<cloud-name>/image/upload",
+    "uploadFields": {
+      "timestamp": 1737000000,
+      "public_id": "<generated-id>",
+      "asset_folder": "carhub/submissions",
+      "upload_preset": "<signed-preset>",
+      "overwrite": false,
+      "allowed_formats": "jpg,png,webp",
+      "api_key": "<cloudinary-api-key>",
+      "signature": "<temporary-signature>"
+    }
+  }
+}
+```
+
+Kirim file menggunakan `multipart/form-data` dengan method `POST` ke `uploadUrl`. Sertakan field `file` dan semua pasangan nama/nilai dari `uploadFields`. Cloudinary mengembalikan `secure_url`; gunakan URL itu sebagai `imageUrl` pada `POST /api/submissions`. API secret tidak pernah dikirim ke browser. Upload preset harus bertipe signed dan host API upload tetap `api.cloudinary.com`.
+
+**Respons error:** `403 FORBIDDEN` jika Origin tidak diizinkan, `422 VALIDATION_ERROR` jika tipe konten/ukuran deklaratif tidak valid, `429 RATE_LIMITED` jika batas request tercapai, atau `500 INTERNAL_ERROR` jika konfigurasi/signature gagal.
+
+### `POST /api/admin/uploads/cars`
+
+Meminta URL dan field upload Cloudinary untuk foto mobil katalog. Endpoint ini memerlukan sesi admin aktif dan `Origin` yang termasuk dalam `FRONTEND_ORIGINS`. Request body, respons, serta alur upload langsung ke Cloudinary sama dengan `POST /api/uploads/submissions`, kecuali `asset_folder` bernilai `carhub/cars`. Nilai ukuran tetap merupakan deklarasi klien, bukan batas keras pada file yang diunggah.
+
+**Respons error:** `401 UNAUTHENTICATED` jika sesi admin tidak aktif, `403 FORBIDDEN` jika Origin tidak diizinkan, `422 VALIDATION_ERROR` jika tipe konten/ukuran deklaratif tidak valid, atau `500 INTERNAL_ERROR` jika konfigurasi/signature gagal.
+
 ## Endpoint admin: autentikasi
 
 ### `POST /api/admin/auth/login`

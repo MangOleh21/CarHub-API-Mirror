@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
-import { verifyVercelBlobImage } from '../src/services/verify-image.js';
+import { verifyManagedImage } from '../src/services/verify-image.js';
 
 const originalFetch = globalThis.fetch;
 
@@ -13,10 +13,10 @@ test('existing non-Vercel HTTPS image URLs remain compatible without a server-si
     throw new Error('External URLs must not be fetched');
   };
 
-  assert.equal(await verifyVercelBlobImage('https://images.example.test/car.jpg'), true);
+  assert.equal(await verifyManagedImage('https://images.example.test/car.jpg'), true);
 });
 
-test('uploaded Vercel Blob images are checked against file signatures and response content type', async () => {
+test('managed image URLs are checked against file signatures and response content type', async () => {
   const cases = [
     { type: 'image/jpeg', bytes: [0xff, 0xd8, 0xff] },
     { type: 'image/png', bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
@@ -34,7 +34,7 @@ test('uploaded Vercel Blob images are checked against file signatures and respon
     };
 
     assert.equal(
-      await verifyVercelBlobImage(`https://store.public.blob.vercel-storage.com/cars/car.${type.slice(6)}`),
+      await verifyManagedImage(`https://store.public.blob.vercel-storage.com/cars/car.${type.slice(6)}`),
       true,
     );
     assert.equal(requestOptions.redirect, 'error');
@@ -49,7 +49,37 @@ test('uploaded Vercel Blob URLs with mismatched or unsupported image bytes are r
   });
 
   assert.equal(
-    await verifyVercelBlobImage('https://store.public.blob.vercel-storage.com/cars/not-an-image.png'),
+    await verifyManagedImage('https://store.public.blob.vercel-storage.com/cars/not-an-image.png'),
+    false,
+  );
+});
+
+test('Cloudinary images are checked against their actual bytes', async () => {
+  let requestOptions;
+  globalThis.fetch = async (_url, options) => {
+    requestOptions = options;
+    return new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), {
+      status: 206,
+      headers: { 'content-type': 'image/png' },
+    });
+  };
+
+  assert.equal(
+    await verifyManagedImage('https://res.cloudinary.com/carhub-demo/image/upload/v123/car.png'),
+    true,
+  );
+  assert.equal(requestOptions.redirect, 'error');
+  assert.equal(requestOptions.headers.range, 'bytes=0-11');
+});
+
+test('Cloudinary image URLs with non-image contents are rejected', async () => {
+  globalThis.fetch = async () => new Response('<script>alert(1)</script>', {
+    status: 206,
+    headers: { 'content-type': 'image/png' },
+  });
+
+  assert.equal(
+    await verifyManagedImage('https://res.cloudinary.com/carhub-demo/image/upload/v123/not-an-image.png'),
     false,
   );
 });

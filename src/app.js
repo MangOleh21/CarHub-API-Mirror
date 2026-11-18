@@ -88,10 +88,15 @@ export function createApp({
     const errorCode = typeof error.code === 'string' && /^[A-Z0-9_]+$/.test(error.code)
       ? error.code
       : undefined;
+    const errorClass = typeof error?.constructor?.name === 'string'
+      && /^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(error.constructor.name)
+      ? error.constructor.name
+      : 'Error';
 
     logger.error('API request failed', {
       path: request.path,
       errorName: error.name,
+      errorClass,
       ...(errorCode ? { errorCode } : {}),
     });
     return response.status(500).json({

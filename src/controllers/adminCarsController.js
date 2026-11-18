@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { verifyVercelBlobImage } from '../services/verify-image.js';
+import { verifyManagedImage } from '../services/verify-image.js';
 
 const carInputSchema = z.object({
   brand: z.string().trim().min(1).max(100),
@@ -48,7 +48,7 @@ export function createAdminCarsController(carModel) {
       if (!parsed.success) {
         return validationError(response, parsed.error, 'Invalid car data');
       }
-      if (!await verifyVercelBlobImage(parsed.data.imageUrl)) {
+      if (!await verifyManagedImage(parsed.data.imageUrl)) {
         return response.status(422).json({
           error: {
             code: 'INVALID_IMAGE',
@@ -71,7 +71,7 @@ export function createAdminCarsController(carModel) {
       if (!parsed.success) {
         return validationError(response, parsed.error, 'Invalid car data');
       }
-      if (!await verifyVercelBlobImage(parsed.data.imageUrl)) {
+      if (!await verifyManagedImage(parsed.data.imageUrl)) {
         return response.status(422).json({
           error: {
             code: 'INVALID_IMAGE',

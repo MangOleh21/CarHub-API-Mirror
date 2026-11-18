@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { verifyVercelBlobImage } from '../services/verify-image.js';
+import { verifyManagedImage } from '../services/verify-image.js';
 
 const currentYear = new Date().getFullYear();
 const submissionSchema = z.object({
@@ -28,7 +28,7 @@ export function createSubmissionController(submissionModel) {
         },
       });
     }
-    if (!await verifyVercelBlobImage(parsedBody.data.imageUrl)) {
+    if (!await verifyManagedImage(parsedBody.data.imageUrl)) {
       return response.status(422).json({
         error: {
           code: 'INVALID_IMAGE',

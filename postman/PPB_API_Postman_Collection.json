@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "d4a0c40b-f37c-4c8a-894e-15b3beae3cc8",
     "name": "CarHub API",
-    "description": "Collection API CarHub untuk local/development. Login admin memakai cookie HttpOnly yang dikelola cookie jar Postman. Jalankan request berurutan; request Admin cars membuat lalu menghapus mobil uji.",
+    "description": "Collection API CarHub untuk local/development. Login admin memakai cookie HttpOnly yang dikelola cookie jar Postman. Upload foto memakai dua tahap: minta field bertanda tangan dari API, lalu POST file multipart langsung ke Cloudinary. Aset Cloudinary bersifat publik dan tidak dihapus collection; gunakan akun development.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -154,6 +154,98 @@
                   "  pm.expect(body.data.status).to.eql('pending');",
                   "  pm.collectionVariables.set('submissionId', String(body.data.id));",
                   "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Request submission image upload URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contentType\": \"{{uploadContentType}}\",\n  \"size\": {{uploadFileSizeBytes}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/uploads/submissions",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "uploads", "submissions"]
+            }
+          },
+          "description": "Tahap 1: minta URL dan field signed upload. Atur uploadContentType dan uploadFileSizeBytes sesuai file. Ukuran dikirim oleh klien dan bukan batas keras provider. Gunakan hanya environment local/development.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns signed upload URL and fields', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.uploadUrl).to.be.a('string');",
+                  "  pm.environment.set('submissionUploadUrl', body.data.uploadUrl);",
+                  "  Object.entries(body.data.uploadFields).forEach(([key, value]) => {",
+                  "    pm.environment.set('submissionUpload_' + key, String(value));",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload submission image to Cloudinary",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": null },
+                { "key": "api_key", "value": "{{submissionUpload_api_key}}", "type": "text" },
+                { "key": "asset_folder", "value": "{{submissionUpload_asset_folder}}", "type": "text" },
+                { "key": "allowed_formats", "value": "{{submissionUpload_allowed_formats}}", "type": "text" },
+                { "key": "overwrite", "value": "{{submissionUpload_overwrite}}", "type": "text" },
+                { "key": "public_id", "value": "{{submissionUpload_public_id}}", "type": "text" },
+                { "key": "signature", "value": "{{submissionUpload_signature}}", "type": "text" },
+                { "key": "timestamp", "value": "{{submissionUpload_timestamp}}", "type": "text" },
+                { "key": "upload_preset", "value": "{{submissionUpload_upload_preset}}", "type": "text" }
+              ]
+            },
+            "url": "{{submissionUploadUrl}}"
+          },
+          "description": "Tahap 2: pada Body > form-data, pilih file yang sama dengan request tahap 1. Upload dikirim langsung ke Cloudinary. File yang berhasil diunggah bersifat publik dan collection tidak menghapusnya. Gunakan akun local/development.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('uploads image to Cloudinary', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.secure_url).to.be.a('string');",
+                  "  pm.environment.set('submissionImageUrl', body.secure_url);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.environment.unset('submissionUploadUrl');",
+                  "  ['api_key', 'asset_folder', 'allowed_formats', 'overwrite', 'public_id', 'signature', 'timestamp', 'upload_preset'].forEach((key) => {",
+                  "    pm.environment.unset('submissionUpload_' + key);",
+                  "  });",
+                  "}"
                 ]
               }
             }

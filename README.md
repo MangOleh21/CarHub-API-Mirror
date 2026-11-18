@@ -21,8 +21,13 @@ Backend membaca konfigurasi dari `.env`. Jika file itu belum ada, salin `.env.ex
 | `DATABASE_URL` | Connection string PostgreSQL Neon; wajib untuk migrasi dan server |
 | `PORT` | Port server, default `5000` |
 | `FRONTEND_ORIGINS` | Allowlist origin frontend, dipisahkan koma; default `http://localhost:5173` |
+| `CLOUDINARY_CLOUD_NAME` | Cloud name Cloudinary |
+| `CLOUDINARY_API_KEY` | API key Cloudinary |
+| `CLOUDINARY_API_SECRET` | API secret Cloudinary; hanya disimpan di backend |
+| `CLOUDINARY_UPLOAD_PRESET` | Nama upload preset bertipe signed |
 
 Pastikan `DATABASE_URL` menunjuk ke database yang benar sebelum menjalankan migrasi. Runner menerapkan file migration bernomor yang belum tercatat, termasuk migration `002` untuk lokasi submission. Migration hanya perlu dijalankan setelah target database dipastikan benar.
+Untuk upload gambar, isi variabel `CLOUDINARY_*` pada `backend/.env` dan environment backend di Vercel. Buat upload preset Cloudinary bertipe signed. Jangan pernah menaruh `CLOUDINARY_API_SECRET` di frontend, membagikannya, atau meng-commit nilainya. Browser menerima signature sementara dari API, lalu mengirim file langsung ke Cloudinary.
 
 ```bash
 npm run db:migrate
@@ -44,7 +49,7 @@ npm run dev
 
 ## Deployment ke Vercel
 
-Atur Root Directory proyek Vercel ke `backend/`. Express app diekspor dari `src/app.js` sebagai handler default. Tambahkan `DATABASE_URL` dan `FRONTEND_ORIGINS` pada Environment Variables Vercel; jangan letakkan `DATABASE_URL` di frontend. Lihat [dokumentasi Express di Vercel](https://vercel.com/docs/frameworks/backend/express).
+Atur Root Directory proyek Vercel ke `backend/`. Express app diekspor dari `src/app.js` sebagai handler default. Tambahkan `DATABASE_URL`, `FRONTEND_ORIGINS`, dan seluruh variabel `CLOUDINARY_*` pada Environment Variables Vercel; jangan letakkan `DATABASE_URL` atau `CLOUDINARY_API_SECRET` di frontend. Lihat [dokumentasi Express di Vercel](https://vercel.com/docs/frameworks/backend/express).
 
 ## Endpoint
 
@@ -58,6 +63,7 @@ Lihat [dokumentasi lengkap API](./docs/API_DOCUMENTATION.md) untuk skema request
 | `GET /api/health` | Status API |
 | `GET /api/cars?search=&brand=&page=1&pageSize=20` | Daftar mobil terpaginasikan; `search`, `brand`, `page`, dan `pageSize` opsional |
 | `GET /api/cars/:id` | Detail mobil |
+| `POST /api/uploads/submissions` | Meminta field upload bertanda tangan untuk foto pengajuan |
 | `POST /api/submissions` | Mengirim pengajuan jual mobil; membuat submission berstatus `pending` |
 
 Contoh body `POST /api/submissions`:
@@ -90,6 +96,7 @@ Admin login memakai cookie sesi HttpOnly; jangan mengirim token lewat LocalStora
 | `POST /api/admin/auth/logout` | Origin tepercaya | Mencabut sesi dan menghapus cookie |
 | `GET /api/admin/cars?search=&brand=&page=1&pageSize=20` | Admin terautentikasi | Daftar mobil terpaginasikan untuk pengelolaan |
 | `GET /api/admin/cars/:id` | Admin terautentikasi | Detail mobil |
+| `POST /api/admin/uploads/cars` | Admin terautentikasi + Origin tepercaya | Meminta field upload bertanda tangan untuk foto mobil |
 | `POST /api/admin/cars` | Admin terautentikasi + Origin tepercaya | Membuat mobil katalog |
 | `PUT /api/admin/cars/:id` | Admin terautentikasi + Origin tepercaya | Mengganti seluruh data mobil |
 | `DELETE /api/admin/cars/:id` | Admin terautentikasi + Origin tepercaya | Menghapus permanen; respons `204` |
@@ -126,10 +133,14 @@ ID database bertipe `BIGINT` dan dikirim API sebagai string agar tidak kehilanga
 
 ## Postman
 
-Import `postman/PPB_API_Postman_Collection.json` dan `postman/PPB_API_Postman_Environment.json`. Pilih environment **CarHub Local**, lalu isi variabel kredensial admin. Host dan port API bisa diubah melalui `apiHost` dan `apiPort`. Collection membuat lalu menghapus mobil uji, serta mengirim dan mengapprove submission; gunakan hanya pada database local/development.
+Import `postman/PPB_API_Postman_Collection.json` dan `postman/PPB_API_Postman_Environment.json`. Pilih environment **CarHub Local**, lalu isi variabel kredensial admin jika ingin menjalankan request admin. Host dan port API bisa diubah melalui `apiHost` dan `apiPort`.
+
+Untuk menguji upload gambar, buka folder **Public API** dan jalankan **Request submission image upload URL**. Atur `uploadContentType` dan `uploadFileSizeBytes` sesuai file, lalu jalankan **Upload submission image to Cloudinary** dan pilih file yang sama pada bagian Body > form-data. Foto yang berhasil akan menjadi aset publik di Cloudinary dan tidak dihapus oleh collection, jadi gunakan hanya akun local/development. Salin `submissionImageUrl` dari environment ke field `imageUrl` pada request **Create car submission** jika ingin membuat submission dengan foto tersebut. Batas 5 MiB divalidasi UI dan API berdasarkan ukuran yang dilaporkan klien; signed direct upload tidak dapat memaksakan batas ukuran file di Cloudinary. Rincian kontrak ada di [dokumentasi API](./docs/API_DOCUMENTATION.md#post-apiuploadssubmissions).
+
+Collection juga dapat membuat dan menghapus mobil uji, serta mengirim dan mengapprove submission; gunakan hanya pada database local/development.
 
 ## Troubleshooting
 
 - SSL warning dari `pg-connection-string`: pool mengubah `sslmode=prefer`, `require`, atau `verify-ca` menjadi `verify-full`, yang mempertahankan verifikasi penuh TLS.
-- Jika endpoint mengembalikan `500`, log server sekarang mencatat `errorCode` tanpa menampilkan pesan database. Kode PostgreSQL `42P01` berarti tabel tidak ditemukan; pastikan `DATABASE_URL` menunjuk ke database development yang benar dan migration sudah diterapkan.
+- Jika endpoint mengembalikan `500`, log server mencatat `errorClass` dan `errorCode` tanpa menampilkan pesan error. Untuk upload Cloudinary, periksa konfigurasi `CLOUDINARY_*` pada environment backend; saat meminta bantuan debug, bagikan hanya `errorClass` dan `errorCode`, bukan isi error mentah atau kredensial. Kode PostgreSQL `42P01` berarti tabel tidak ditemukan; pastikan `DATABASE_URL` menunjuk ke database development yang benar dan migration sudah diterapkan.
 - Jangan membagikan nilai `DATABASE_URL`; cukup bagikan `errorCode` jika meminta bantuan debug.

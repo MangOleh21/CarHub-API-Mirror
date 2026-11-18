@@ -1,4 +1,5 @@
 const blobHostSuffix = '.public.blob.vercel-storage.com';
+const cloudinaryHost = 'res.cloudinary.com';
 const signatureLength = 12;
 
 function getImageType(bytes) {
@@ -24,9 +25,11 @@ function getImageType(bytes) {
   return null;
 }
 
-export async function verifyVercelBlobImage(imageUrl) {
+export async function verifyManagedImage(imageUrl) {
   const url = new URL(imageUrl);
-  if (!url.hostname.endsWith(blobHostSuffix)) return true;
+  const isCloudinaryImage = url.hostname === cloudinaryHost
+    && /^\/[A-Za-z0-9_-]+\/image\/upload\//.test(url.pathname);
+  if (!url.hostname.endsWith(blobHostSuffix) && !isCloudinaryImage) return true;
 
   const response = await fetch(url, {
     headers: { range: `bytes=0-${signatureLength - 1}` },
