@@ -233,3 +233,47 @@ test('submission endpoint requires seller location and an HTTPS image URL', asyn
   assert.equal(missingLocation.status, 422);
   assert.equal(missingImage.status, 422);
 });
+
+test('submission endpoint rejects a Vercel Blob URL whose contents are not an image', async () => {
+  const originalFetch = globalThis.fetch;
+  const app = createTestApp({
+    submissionModel: {
+      async create() {
+        assert.fail('Invalid uploaded images must not be stored');
+      },
+    },
+  });
+  globalThis.fetch = async (input, options) => {
+    const url = input instanceof Request ? input.url : input;
+    if (url === 'https://store.public.blob.vercel-storage.com/submissions/not-image.png') {
+      return new Response('not an image', {
+        status: 206,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+    return originalFetch(input, options);
+  };
+
+  try {
+    const response = await request(app, '/api/submissions', {
+      method: 'POST',
+      body: {
+        sellerName: 'Ayu',
+        sellerPhone: '628123456789',
+        brand: 'Toyota',
+        model: 'Avanza',
+        year: 2020,
+        transmission: 'Automatic',
+        mileage: 25_000,
+        expectedPrice: 180_000_000,
+        location: 'Jakarta',
+        imageUrl: 'https://store.public.blob.vercel-storage.com/submissions/not-image.png',
+      },
+    });
+
+    assert.equal(response.status, 422);
+    assert.equal(response.body.error.code, 'INVALID_IMAGE');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

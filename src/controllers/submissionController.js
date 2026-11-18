@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { verifyVercelBlobImage } from '../services/verify-image.js';
 
 const currentYear = new Date().getFullYear();
 const submissionSchema = z.object({
@@ -24,6 +25,14 @@ export function createSubmissionController(submissionModel) {
           code: 'VALIDATION_ERROR',
           message: 'Invalid submission',
           details: parsedBody.error.flatten().fieldErrors,
+        },
+      });
+    }
+    if (!await verifyVercelBlobImage(parsedBody.data.imageUrl)) {
+      return response.status(422).json({
+        error: {
+          code: 'INVALID_IMAGE',
+          message: 'Uploaded image must be a valid JPEG, PNG, or WebP file.',
         },
       });
     }

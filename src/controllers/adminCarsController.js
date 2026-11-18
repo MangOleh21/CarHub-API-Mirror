@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { verifyVercelBlobImage } from '../services/verify-image.js';
 
 const carInputSchema = z.object({
   brand: z.string().trim().min(1).max(100),
@@ -47,6 +48,14 @@ export function createAdminCarsController(carModel) {
       if (!parsed.success) {
         return validationError(response, parsed.error, 'Invalid car data');
       }
+      if (!await verifyVercelBlobImage(parsed.data.imageUrl)) {
+        return response.status(422).json({
+          error: {
+            code: 'INVALID_IMAGE',
+            message: 'Uploaded image must be a valid JPEG, PNG, or WebP file.',
+          },
+        });
+      }
 
       const car = await carModel.create(parsed.data);
       return response.status(201).json({ success: true, data: car });
@@ -61,6 +70,14 @@ export function createAdminCarsController(carModel) {
       const parsed = carInputSchema.safeParse(request.body);
       if (!parsed.success) {
         return validationError(response, parsed.error, 'Invalid car data');
+      }
+      if (!await verifyVercelBlobImage(parsed.data.imageUrl)) {
+        return response.status(422).json({
+          error: {
+            code: 'INVALID_IMAGE',
+            message: 'Uploaded image must be a valid JPEG, PNG, or WebP file.',
+          },
+        });
       }
 
       const car = await carModel.update(parsedId.data, parsed.data);

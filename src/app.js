@@ -12,7 +12,9 @@ import { registerAdminCarsRoutes } from './routes/adminCarsRoutes.js';
 import { registerAdminSubmissionsRoutes } from './routes/adminSubmissionsRoutes.js';
 import { registerAdminUsersRoutes } from './routes/adminUsersRoutes.js';
 import { registerCarRoutes } from './routes/carsRoutes.js';
+import { registerImageUploadRoutes } from './routes/imageUploadRoutes.js';
 import { registerSubmissionRoutes } from './routes/submissionsRoutes.js';
+import { createImageUpload } from './services/image-upload.js';
 
 export function createApp({
   carModel,
@@ -20,6 +22,7 @@ export function createApp({
   adminModel,
   allowedOrigins = parseAllowedOrigins(),
   logger = console,
+  imageUploadService = createImageUpload,
 } = {}) {
   const app = express();
 
@@ -48,6 +51,7 @@ export function createApp({
   registerAdminAuthRoutes(app, { adminModel, allowedOrigins });
   registerAdminSubmissionsRoutes(app, { submissionModel, adminModel, allowedOrigins });
   registerAdminUsersRoutes(app, { adminModel, allowedOrigins });
+  registerImageUploadRoutes(app, { adminModel, allowedOrigins, imageUploadService });
 
   app.use((_request, response) => {
     response.status(404).json({

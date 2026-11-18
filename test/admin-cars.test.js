@@ -226,3 +226,40 @@ test('admin car writes reject untrusted origins, invalid payloads, and missing r
     await client.close();
   }
 });
+
+test('admin car writes reject Vercel Blob URLs whose contents are not images', async () => {
+  const originalFetch = globalThis.fetch;
+  let writeCalls = 0;
+  const client = await createClient({
+    async create() {
+      writeCalls += 1;
+      return car;
+    },
+  });
+  globalThis.fetch = async (input, options) => {
+    const url = input instanceof Request ? input.url : input;
+    if (url === 'https://store.public.blob.vercel-storage.com/cars/not-image.png') {
+      return new Response('not an image', {
+        status: 206,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+    return originalFetch(input, options);
+  };
+
+  try {
+    const response = await client.request('/api/admin/cars', {
+      method: 'POST',
+      cookie: sessionCookie,
+      origin,
+      body: { ...carInput, imageUrl: 'https://store.public.blob.vercel-storage.com/cars/not-image.png' },
+    });
+
+    assert.equal(response.status, 422);
+    assert.equal(response.body.error.code, 'INVALID_IMAGE');
+    assert.equal(writeCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await client.close();
+  }
+});
