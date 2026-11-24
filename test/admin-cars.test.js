@@ -125,10 +125,11 @@ test('admin can create a car with validated catalog fields', async () => {
       method: 'POST',
       cookie: sessionCookie,
       origin,
-      body: carInput,
+      body: { ...carInput, transmission: 'DCT' },
     });
 
     assert.equal(response.status, 201);
+    assert.equal(receivedInput.transmission, 'DCT');
     assert.equal(receivedInput.fuelType, 'Bensin');
     assert.equal(receivedInput.description, null);
     assert.deepEqual(response.body.data, car);

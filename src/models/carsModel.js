@@ -21,6 +21,15 @@ const carColumns = `
 
 export function createCarsModel(pool) {
   return {
+    async listBrands() {
+      const result = await pool.query(
+        `SELECT brand
+         FROM (SELECT DISTINCT brand FROM cars) AS catalog_brands
+         ORDER BY LOWER(brand), brand`,
+      );
+      return result.rows.map(({ brand }) => brand);
+    },
+
     async list({
       search,
       brand,

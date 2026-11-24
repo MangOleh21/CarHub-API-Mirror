@@ -107,3 +107,19 @@ test('car model filters and sorts catalog records with parameterized values', as
     0,
   ]);
 });
+
+test('car model lists distinct catalog brands in case-insensitive alphabetical order', async () => {
+  let queryText;
+  const model = createCarsModel({
+    async query(sql) {
+      queryText = sql;
+      return { rows: [{ brand: 'Honda' }, { brand: 'Toyota' }] };
+    },
+  });
+
+  assert.deepEqual(await model.listBrands(), ['Honda', 'Toyota']);
+  assert.match(
+    queryText.replace(/\s+/g, ' '),
+    /SELECT brand FROM \(SELECT DISTINCT brand FROM cars\) AS catalog_brands ORDER BY LOWER\(brand\), brand/,
+  );
+});

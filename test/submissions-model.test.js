@@ -72,6 +72,7 @@ function createPool(submissionRow) {
 test('approval atomically creates a car and prefers seller data over admin fallbacks', async () => {
   const sellerSubmission = {
     ...submission,
+    fuelType: 'Hybrid',
     imageUrl: 'https://seller.example/car.jpg',
     images: [
       'https://seller.example/car.jpg',
@@ -108,10 +109,11 @@ test('approval atomically creates a car and prefers seller data over admin fallb
     },
     car: { id: '91' },
   });
-  assert.equal(insertCall.values[5], '180000000');
-  assert.equal(insertCall.values[6], 'https://seller.example/car.jpg');
-  assert.deepEqual(insertCall.values[7], sellerSubmission.images);
-  assert.equal(insertCall.values[10], 'Bandung');
+  assert.equal(insertCall.values[6], '180000000');
+  assert.equal(insertCall.values[4], 'Hybrid');
+  assert.equal(insertCall.values[7], 'https://seller.example/car.jpg');
+  assert.deepEqual(insertCall.values[8], sellerSubmission.images);
+  assert.equal(insertCall.values[11], 'Bandung');
   assert.match(
     calls.find(({ statement }) => statement.startsWith('UPDATE submissions')).statement,
     /reviewed_at = NOW\(\)/,
@@ -148,6 +150,7 @@ test('submission model stores the image gallery alongside its first-image alias'
     model: 'Avanza',
     year: 2020,
     transmission: 'Automatic',
+    fuelType: 'Diesel',
     mileage: 25_000,
     expectedPrice: 180_000_000,
     location: 'Jakarta',
@@ -161,8 +164,10 @@ test('submission model stores the image gallery alongside its first-image alias'
     createdAt: '2026-11-24T00:00:00.000Z',
   });
   assert.match(calls[0].statement, /INSERT INTO submissions/);
-  assert.equal(calls[0].values[9], images[0]);
-  assert.deepEqual(calls[0].values[10], images);
+  assert.match(calls[0].statement, /fuel_type/);
+  assert.equal(calls[0].values[6], 'Diesel');
+  assert.equal(calls[0].values[10], images[0]);
+  assert.deepEqual(calls[0].values[11], images);
 });
 
 test('approval of legacy submission requires missing location or photo before creating a car', async () => {
@@ -198,9 +203,10 @@ test('approval fills missing legacy submission fields from the admin payload', a
   assert.equal(result.kind, 'updated');
   assert.equal(result.submission.reviewedByEmail, 'admin@example.test');
   assert.equal(result.submission.reviewNote, null);
-  assert.equal(insertCall.values[6], 'https://images.example/car.jpg');
-  assert.deepEqual(insertCall.values[7], ['https://images.example/car.jpg']);
-  assert.equal(insertCall.values[10], 'Jakarta');
+  assert.equal(insertCall.values[7], 'https://images.example/car.jpg');
+  assert.equal(insertCall.values[4], 'Bensin');
+  assert.deepEqual(insertCall.values[8], ['https://images.example/car.jpg']);
+  assert.equal(insertCall.values[11], 'Jakarta');
 });
 
 test('a submission that is no longer pending cannot create another catalog car', async () => {

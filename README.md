@@ -26,7 +26,7 @@ Backend membaca konfigurasi dari `.env`. Jika file itu belum ada, salin `.env.ex
 | `CLOUDINARY_API_SECRET` | API secret Cloudinary; hanya disimpan di backend |
 | `CLOUDINARY_UPLOAD_PRESET` | Nama upload preset bertipe signed |
 
-Pastikan `DATABASE_URL` menunjuk ke database yang benar sebelum menjalankan migrasi. Runner menerapkan file migration bernomor yang belum tercatat, termasuk migration `002` untuk lokasi submission. Migration hanya perlu dijalankan setelah target database dipastikan benar.
+Pastikan `DATABASE_URL` menunjuk ke database yang benar sebelum menjalankan migrasi. Runner menerapkan file migration bernomor yang belum tercatat. Migration `005` memperluas pilihan transmisi dan menambahkan kolom bahan bakar nullable pada submission; migration ini tidak memperbarui baris yang sudah ada. Migration hanya perlu dijalankan setelah target database dipastikan benar.
 Untuk upload gambar, isi variabel `CLOUDINARY_*` pada `backend/.env` dan environment backend di Vercel. Buat upload preset Cloudinary bertipe signed. Jangan pernah menaruh `CLOUDINARY_API_SECRET` di frontend, membagikannya, atau meng-commit nilainya. Browser menerima signature sementara dari API, lalu mengirim file langsung ke Cloudinary.
 
 ```bash
@@ -76,6 +76,7 @@ Contoh body `POST /api/submissions`:
   "model": "Avanza",
   "year": 2020,
   "transmission": "Automatic",
+  "fuelType": "Bensin",
   "mileage": 25000,
   "expectedPrice": 180000000,
   "images": [
@@ -86,7 +87,7 @@ Contoh body `POST /api/submissions`:
 }
 ```
 
-`location` dan satu hingga sepuluh URL foto HTTPS pada `images` wajib. Field lama `imageUrl` tunggal tetap diterima untuk kompatibilitas. `description` opsional. Foto disimpan sebagai URL, bukan file di database.
+`location` dan satu hingga sepuluh URL foto HTTPS pada `images` wajib. `transmission` menerima `Manual`, `Automatic`, `CVT`, `DCT`, atau `AMT`. `fuelType` menerima `Bensin`, `Diesel`, `Hybrid`, atau `Listrik`, dan default ke `Bensin` jika tidak dikirim oleh klien lama. Field `imageUrl` tunggal tetap diterima untuk kompatibilitas. `description` opsional. Foto disimpan sebagai URL, bukan file di database.
 
 ### Admin
 
@@ -124,12 +125,12 @@ Kirim body yang sama ke `/api/admin/submissions/:id/approved` atau `/api/admin/s
 
 ## Skema database
 
-Migration berada di `migrations/001_initial_schema.sql` hingga `migrations/004_add_car_images_and_reviewed_at.sql`. Migration `004` menambahkan `images` pada mobil dan submission, mengisi foto pertama dari `image_url` lama, dan menambahkan `submissions.reviewed_at`.
+Migration berada di `migrations/001_initial_schema.sql` hingga `migrations/005_add_submission_fuel_type_and_transmission_options.sql`. Migration `004` menambahkan galeri foto dan timestamp review; migration `005` memperluas opsi transmisi dan menambahkan `submissions.fuel_type` nullable tanpa mengubah baris yang sudah ada.
 
 | Tabel | Kolom utama |
 |---|---|
 | `cars` | `id`, `brand`, `model`, `year`, `transmission`, `fuel_type`, `mileage`, `price`, `image_url`, `images`, `seller_name`, `seller_phone`, `location`, `description`, `created_at` |
-| `submissions` | `id`, `seller_name`, `seller_phone`, `brand`, `model`, `year`, `transmission`, `mileage`, `expected_price`, `image_url`, `images`, `location`, `description`, `status`, `reviewed_by_email`, `review_note`, `reviewed_at`, `created_at` |
+| `submissions` | `id`, `seller_name`, `seller_phone`, `brand`, `model`, `year`, `transmission`, `fuel_type`, `mileage`, `expected_price`, `image_url`, `images`, `location`, `description`, `status`, `reviewed_by_email`, `review_note`, `reviewed_at`, `created_at` |
 | `admin_users` | `id`, `email`, `password_hash`, `role` (`owner` atau `admin`), `is_active`, `created_at` |
 | `admin_sessions` | `id`, `admin_user_id`, `token_hash`, `expires_at`, `revoked_at`, `created_at` |
 

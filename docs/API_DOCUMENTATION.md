@@ -22,7 +22,7 @@ Untuk deployment, ganti dengan URL API yang dikonfigurasi. Jangan pernah mengiri
 - ID database `BIGINT` selalu dikirim sebagai string.
 - `price` dan `expectedPrice` juga dikirim sebagai string dalam objek respons agar nilainya tetap presisi. Dalam request, keduanya dikirim sebagai JSON number.
 - Waktu `createdAt` dikirim sebagai timestamp ISO 8601.
-- Field dengan nilai `null` dapat muncul pada data lama, khususnya `location`, `imageUrl`, `reviewedByEmail`, `reviewNote`, dan `reviewedAt` pada submission.
+- Field dengan nilai `null` dapat muncul pada data lama, khususnya `location`, `imageUrl`, `fuelType`, `reviewedByEmail`, `reviewNote`, dan `reviewedAt` pada submission.
 - `images` berisi URL gambar berurutan; `imageUrl` tetap tersedia sebagai alias gambar pertama untuk kompatibilitas.
 
 ### Pagination dan filter katalog
@@ -33,7 +33,7 @@ Untuk deployment, ganti dengan URL API yang dikonfigurasi. Jangan pernah mengiri
 |---|---|---:|---|
 | `search` | string | — | Maksimal 100 karakter; pencarian sebagian tanpa membedakan kapital pada brand atau model |
 | `brand` | string | — | Maksimal 100 karakter; pencocokan brand tanpa membedakan kapital |
-| `transmission` | string | — | `Manual` atau `Automatic` |
+| `transmission` | string | — | `Manual`, `Automatic`, `CVT`, `DCT`, atau `AMT` |
 | `minPrice`, `maxPrice` | integer | — | Rentang harga inklusif, positif, dan maksimal `Number.MAX_SAFE_INTEGER`; nilai minimum tidak boleh melebihi maksimum |
 | `minYear`, `maxYear` | integer | — | Rentang tahun inklusif 1886–2100; nilai minimum tidak boleh melebihi maksimum |
 | `sortBy` | string | `createdAt` | `createdAt`, `price`, atau `year` |
@@ -146,6 +146,7 @@ Mengirim pengajuan penjualan mobil. Endpoint ini publik dan membuat submission d
   "model": "Avanza",
   "year": 2020,
   "transmission": "Automatic",
+  "fuelType": "Bensin",
   "mileage": 25000,
   "expectedPrice": 180000000,
   "location": "Bandung",
@@ -157,7 +158,7 @@ Mengirim pengajuan penjualan mobil. Endpoint ini publik dan membuat submission d
 }
 ```
 
-Semua field wajib kecuali `description`. Kirim `images` berisi 1–10 URL HTTPS; `imageUrl` tunggal masih diterima untuk kompatibilitas dan menjadi gambar pertama.
+Semua field wajib kecuali `fuelType` dan `description`. `fuelType` menerima `Bensin`, `Diesel`, `Hybrid`, atau `Listrik`, dengan default `Bensin` untuk klien lama. Kirim `images` berisi 1–10 URL HTTPS; `imageUrl` tunggal masih diterima untuk kompatibilitas dan menjadi gambar pertama.
 
 | Field | Tipe | Aturan |
 |---|---|---|
@@ -166,7 +167,8 @@ Semua field wajib kecuali `description`. Kirim `images` berisi 1–10 URL HTTPS;
 | `brand` | string | Wajib, 1–100 karakter |
 | `model` | string | Wajib, 1–100 karakter |
 | `year` | integer | Wajib, 1886 sampai tahun berjalan + 1 |
-| `transmission` | string | Wajib: `Manual` atau `Automatic` |
+| `transmission` | string | Wajib: `Manual`, `Automatic`, `CVT`, `DCT`, atau `AMT` |
+| `fuelType` | string | Opsional: `Bensin`, `Diesel`, `Hybrid`, atau `Listrik`; default `Bensin` |
 | `mileage` | integer | Validator request menerima 0 sampai `Number.MAX_SAFE_INTEGER`, tetapi kolom database bertipe `INT`; nilai di atas 2.147.483.647 dapat gagal disimpan dan menghasilkan `500`. Batas praktis saat ini: 2.147.483.647 |
 | `expectedPrice` | integer | Wajib, positif dan tidak melebihi `Number.MAX_SAFE_INTEGER` |
 | `location` | string | Wajib, 1–150 karakter setelah trim |
@@ -380,7 +382,7 @@ Body `POST` dan `PUT` harus berupa object strict dengan field berikut:
 | `brand` | string | Wajib, 1–100 karakter setelah trim |
 | `model` | string | Wajib, 1–100 karakter setelah trim |
 | `year` | integer | Wajib, 1886–2100 |
-| `transmission` | string | Wajib: `Manual` atau `Automatic` |
+| `transmission` | string | Wajib: `Manual`, `Automatic`, `CVT`, `DCT`, atau `AMT` |
 | `fuelType` | string | Opsional, 1–50 karakter; default `Bensin` |
 | `mileage` | integer | Wajib, 0–2.147.483.647 |
 | `price` | integer | Wajib, positif dan tidak melebihi `Number.MAX_SAFE_INTEGER` |
@@ -415,7 +417,7 @@ Mengambil daftar submission dengan pagination. Hasil diurutkan dari data terbaru
 
 ### `PATCH /api/admin/submissions/:id/approved`
 
-Menyetujui submission pending dan membuat mobil katalog dalam satu transaksi. Data kendaraan, seller, harga, dan deskripsi diambil dari submission. Nilai `fuelType` mobil yang dibuat memakai default database `Bensin`.
+Menyetujui submission pending dan membuat mobil katalog dalam satu transaksi. Data kendaraan, seller, harga, deskripsi, dan `fuelType` diambil dari submission. Untuk submission lama yang belum memiliki `fuelType`, nilai mobil baru tetap memakai `Bensin`.
 
 Untuk submission lama yang belum mempunyai lokasi/foto, body dapat mengisi nilai yang hilang. Nilai pada submission yang sudah tersedia tetap digunakan. Lokasi dan URL foto diperlukan agar approval dapat berhasil.
 
@@ -588,6 +590,7 @@ Menonaktifkan akun aktif dengan role `admin`; sesi aktif akun tersebut ikut dica
   "model": "Avanza",
   "year": 2020,
   "transmission": "Automatic",
+  "fuelType": "Bensin",
   "mileage": 25000,
   "expectedPrice": "180000000",
   "images": [

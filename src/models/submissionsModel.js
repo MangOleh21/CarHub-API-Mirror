@@ -6,6 +6,7 @@ const submissionColumns = `
   model,
   year,
   transmission,
+  fuel_type AS "fuelType",
   mileage,
   expected_price::text AS "expectedPrice",
   image_url AS "imageUrl",
@@ -48,6 +49,7 @@ export function createSubmissionsModel(pool) {
            model,
            year,
            transmission,
+           fuel_type,
            mileage,
            expected_price,
            location,
@@ -55,7 +57,7 @@ export function createSubmissionsModel(pool) {
            images,
            description
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          RETURNING id::text AS id, status, created_at AS "createdAt"`,
         [
           input.sellerName,
@@ -64,6 +66,7 @@ export function createSubmissionsModel(pool) {
           input.model,
           input.year,
           input.transmission,
+          input.fuelType ?? 'Bensin',
           input.mileage,
           input.expectedPrice,
           input.location,
@@ -157,6 +160,7 @@ export function createSubmissionsModel(pool) {
              model,
              year,
              transmission,
+             fuel_type,
              mileage,
              price,
              image_url,
@@ -166,13 +170,14 @@ export function createSubmissionsModel(pool) {
              location,
              description
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
            RETURNING id::text AS id`,
           [
             submission.brand,
             submission.model,
             submission.year,
             submission.transmission,
+            submission.fuelType ?? 'Bensin',
             submission.mileage,
             submission.expectedPrice,
             images[0],

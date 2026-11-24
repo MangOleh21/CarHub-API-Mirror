@@ -8,7 +8,7 @@ const carInputSchema = z.object({
   brand: z.string().trim().min(1).max(100),
   model: z.string().trim().min(1).max(100),
   year: z.number().int().min(1886).max(2100),
-  transmission: z.enum(['Manual', 'Automatic']),
+  transmission: z.enum(['Manual', 'Automatic', 'CVT', 'DCT', 'AMT']),
   fuelType: z.string().trim().min(1).max(50).default('Bensin'),
   mileage: z.number().int().min(0).max(2_147_483_647),
   price: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),

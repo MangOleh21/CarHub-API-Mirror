@@ -102,6 +102,22 @@ test('car list validates filters and returns paginated results', async () => {
   });
 });
 
+test('public car brands endpoint returns the current distinct catalog brands', async () => {
+  const app = createTestApp({
+    carModel: {
+      async listBrands() { return ['Honda', 'Toyota']; },
+    },
+  });
+
+  const response = await request(app, '/api/cars/brands');
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body, {
+    success: true,
+    data: ['Honda', 'Toyota'],
+  });
+});
+
 test('car list accepts range filters and sorting and rejects inverted ranges', async () => {
   let receivedFilters;
   const app = createTestApp({
@@ -115,11 +131,11 @@ test('car list accepts range filters and sorting and rejects inverted ranges', a
 
   const response = await request(
     app,
-    '/api/cars?minPrice=100000000&maxPrice=200000000&minYear=2018&maxYear=2022&transmission=Automatic&sortBy=price&sortOrder=asc',
+    '/api/cars?minPrice=100000000&maxPrice=200000000&minYear=2018&maxYear=2022&transmission=CVT&sortBy=price&sortOrder=asc',
   );
   assert.equal(response.status, 200);
   assert.deepEqual(receivedFilters, {
-    transmission: 'Automatic',
+    transmission: 'CVT',
     minPrice: 100_000_000,
     maxPrice: 200_000_000,
     minYear: 2018,
@@ -191,7 +207,8 @@ test('submission endpoint validates input and returns the pending submission', a
       brand: 'Toyota',
       model: 'Avanza',
       year: 2020,
-      transmission: 'Automatic',
+      transmission: 'CVT',
+      fuelType: 'Listrik',
       mileage: 25_000,
       expectedPrice: 180_000_000,
       location: 'Jakarta',
@@ -205,6 +222,8 @@ test('submission endpoint validates input and returns the pending submission', a
 
   assert.equal(response.status, 201);
   assert.equal(receivedInput.sellerName, 'Ayu');
+  assert.equal(receivedInput.transmission, 'CVT');
+  assert.equal(receivedInput.fuelType, 'Listrik');
   assert.equal(receivedInput.location, 'Jakarta');
   assert.equal(receivedInput.imageUrl, 'https://images.example/car.jpg');
   assert.deepEqual(receivedInput.images, [
@@ -212,6 +231,37 @@ test('submission endpoint validates input and returns the pending submission', a
     'https://images.example/car-side.jpg',
   ]);
   assert.equal(response.body.data.status, 'pending');
+});
+
+test('submission endpoint defaults fuel type for clients that omit the new field', async () => {
+  let receivedInput;
+  const app = createTestApp({
+    submissionModel: {
+      async create(input) {
+        receivedInput = input;
+        return { id: '56', status: 'pending', createdAt: '2026-11-17T00:00:00.000Z' };
+      },
+    },
+  });
+
+  const response = await request(app, '/api/submissions', {
+    method: 'POST',
+    body: {
+      sellerName: 'Ayu',
+      sellerPhone: '628123456789',
+      brand: 'Toyota',
+      model: 'Avanza',
+      year: 2020,
+      transmission: 'Manual',
+      mileage: 25_000,
+      expectedPrice: 180_000_000,
+      location: 'Jakarta',
+      imageUrl: 'https://images.example/car.jpg',
+    },
+  });
+
+  assert.equal(response.status, 201);
+  assert.equal(receivedInput.fuelType, 'Bensin');
 });
 
 test('submission endpoint rejects non-HTTPS image URLs and non-positive prices', async () => {

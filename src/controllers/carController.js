@@ -6,7 +6,7 @@ const optionalFilter = z.string().trim().max(100).optional()
 const listQuerySchema = z.object({
   search: optionalFilter,
   brand: optionalFilter,
-  transmission: z.enum(['Manual', 'Automatic']).optional(),
+  transmission: z.enum(['Manual', 'Automatic', 'CVT', 'DCT', 'AMT']).optional(),
   minPrice: z.coerce.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional(),
   maxPrice: z.coerce.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional(),
   minYear: z.coerce.number().int().min(1886).max(2100).optional(),
@@ -40,6 +40,11 @@ function validationError(response, error, message) {
 
 export function createCarController(carModel) {
   return {
+    listBrands: async (_request, response) => {
+      const brands = await carModel.listBrands();
+      return response.status(200).json({ success: true, data: brands });
+    },
+
     list: async (request, response) => {
       const parsedQuery = listQuerySchema.safeParse(request.query);
       if (!parsedQuery.success) {
