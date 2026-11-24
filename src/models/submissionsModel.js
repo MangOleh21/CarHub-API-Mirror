@@ -9,20 +9,18 @@ const submissionColumns = `
   mileage,
   expected_price::text AS "expectedPrice",
   image_url AS "imageUrl",
-  COALESCE(images, ARRAY[]::text[]) AS images,
   location,
   description,
   status,
   reviewed_by_email AS "reviewedByEmail",
   review_note AS "reviewNote",
-  reviewed_at AS "reviewedAt",
   created_at AS "createdAt"
 `;
 
 async function updateReview(client, id, input) {
   const result = await client.query(
     `UPDATE submissions
-     SET status = $1, reviewed_by_email = $2, review_note = $3, reviewed_at = NOW()
+     SET status = $1, reviewed_by_email = $2, review_note = $3
      WHERE id = $4
      RETURNING id::text AS id, status,
                reviewed_by_email AS "reviewedByEmail",
@@ -35,46 +33,6 @@ async function updateReview(client, id, input) {
 export function createSubmissionsModel(pool) {
   return {
     async create(input) {
-      const hasImages = Array.isArray(input.images);
-      const rawImages = hasImages && input.images.length > 0
-        ? input.images
-        : (input.imageUrl ? [input.imageUrl] : []);
-      const primaryImageUrl = rawImages[0] ?? input.imageUrl ?? null;
-
-      if (!hasImages) {
-        const result = await pool.query(
-          `INSERT INTO submissions (
-             seller_name,
-             seller_phone,
-             brand,
-             model,
-             year,
-             transmission,
-             mileage,
-             expected_price,
-             location,
-             image_url,
-             description
-           )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-           RETURNING id::text AS id, status, created_at AS "createdAt"`,
-          [
-            input.sellerName,
-            input.sellerPhone,
-            input.brand,
-            input.model,
-            input.year,
-            input.transmission,
-            input.mileage,
-            input.expectedPrice,
-            input.location,
-            primaryImageUrl,
-            input.description ?? null,
-          ],
-        );
-        return result.rows[0];
-      }
-
       const result = await pool.query(
         `INSERT INTO submissions (
            seller_name,
@@ -87,10 +45,9 @@ export function createSubmissionsModel(pool) {
            expected_price,
            location,
            image_url,
-           images,
            description
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING id::text AS id, status, created_at AS "createdAt"`,
         [
           input.sellerName,
@@ -102,8 +59,7 @@ export function createSubmissionsModel(pool) {
           input.mileage,
           input.expectedPrice,
           input.location,
-          primaryImageUrl,
-          rawImages,
+          input.imageUrl,
           input.description ?? null,
         ],
       );
@@ -167,21 +123,14 @@ export function createSubmissionsModel(pool) {
 
         const location = submission.location?.trim() || input.location;
         const imageUrl = submission.imageUrl?.trim() || input.imageUrl;
-        const rawImages = (Array.isArray(submission.images) && submission.images.length > 0)
-          ? submission.images
-          : (Array.isArray(input.images) && input.images.length > 0)
-            ? input.images
-            : (imageUrl ? [imageUrl] : []);
         const missingFields = [];
         if (!location) missingFields.push('location');
-        if (!imageUrl && rawImages.length === 0) missingFields.push('imageUrl');
+        if (!imageUrl) missingFields.push('imageUrl');
 
         if (missingFields.length > 0) {
           await client.query('ROLLBACK');
           return { kind: 'missing_fields', fields: missingFields };
         }
-
-        const primaryImageUrl = imageUrl || rawImages[0];
 
         const carResult = await client.query(
           `INSERT INTO cars (
@@ -195,9 +144,9 @@ export function createSubmissionsModel(pool) {
              seller_name,
              seller_phone,
              location,
-             description${rawImages.length > 1 ? ', images' : ''}
+             description
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11${rawImages.length > 1 ? ', $12' : ''})
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
            RETURNING id::text AS id`,
           [
             submission.brand,
@@ -206,12 +155,11 @@ export function createSubmissionsModel(pool) {
             submission.transmission,
             submission.mileage,
             submission.expectedPrice,
-            primaryImageUrl,
+            imageUrl,
             submission.sellerName,
             submission.sellerPhone,
             location,
             submission.description,
-            ...(rawImages.length > 1 ? [rawImages] : []),
           ],
         );
         const updated = await updateReview(client, id, input);
