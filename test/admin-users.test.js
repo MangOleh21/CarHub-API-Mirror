@@ -234,3 +234,93 @@ test('owner can deactivate an admin but the owner account cannot be deactivated'
     await client.close();
   }
 });
+
+test('owner can list all admin accounts but admin role is forbidden', async () => {
+  const owner = {
+    id: '1',
+    email: 'owner@example.test',
+    role: 'owner',
+    isActive: true,
+    passwordHash: await hashPassword(loginPassword),
+  };
+  const admin = {
+    id: '2',
+    email: 'staff@example.test',
+    role: 'admin',
+    isActive: true,
+    passwordHash: await hashPassword(loginPassword),
+  };
+  const adminRepository = {
+    async findUserByEmail(email) {
+      if (email === owner.email) return owner;
+      if (email === admin.email) return admin;
+      return null;
+    },
+    async createSession() {},
+    async getActiveSession(token) {
+      return token ? owner : null;
+    },
+    async listAdmins() {
+      return [
+        { id: '1', email: 'owner@example.test', role: 'owner', isActive: true, createdAt: '2026-01-01' },
+        { id: '2', email: 'staff@example.test', role: 'admin', isActive: true, createdAt: '2026-01-02' },
+      ];
+    },
+  };
+  const client = await createClient(createApp(createModels(adminRepository)));
+
+  try {
+    const ownerCookie = await login(client, 'owner@example.test');
+    const response = await client.request('/api/admin/users', {
+      cookie: ownerCookie,
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.data.admins.length, 2);
+    assert.equal(response.body.data.admins[0].email, 'owner@example.test');
+
+    // Admin role should be forbidden
+    adminRepository.getActiveSession = async () => admin;
+    const adminCookie = await login(client, 'staff@example.test');
+    const forbiddenResponse = await client.request('/api/admin/users', {
+      cookie: adminCookie,
+    });
+    assert.equal(forbiddenResponse.status, 403);
+  } finally {
+    await client.close();
+  }
+});
+
+test('creating duplicate admin returns 409 conflict instead of 500 error', async () => {
+  const owner = {
+    id: '1',
+    email: 'owner@example.test',
+    role: 'owner',
+    isActive: true,
+    passwordHash: await hashPassword(loginPassword),
+  };
+  const adminRepository = {
+    async findUserByEmail(email) {
+      return email === owner.email ? owner : null;
+    },
+    async createSession() {},
+    async getActiveSession() { return owner; },
+    async createAdmin() {
+      return null; // simulate duplicate conflict
+    },
+  };
+  const client = await createClient(createApp(createModels(adminRepository)));
+
+  try {
+    const cookie = await login(client);
+    const response = await client.request('/api/admin/users', {
+      method: 'POST',
+      origin,
+      cookie,
+      body: { email: 'existing@example.test', password: 'new-admin-password-123' },
+    });
+    assert.equal(response.status, 409);
+    assert.equal(response.body.error.code, 'ADMIN_EMAIL_EXISTS');
+  } finally {
+    await client.close();
+  }
+});

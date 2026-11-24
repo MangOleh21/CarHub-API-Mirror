@@ -18,6 +18,8 @@ const approvalSchema = z.object({
     .url()
     .refine((value) => new URL(value).protocol === 'https:')
     .optional(),
+  images: z.array(z.string().url().refine((value) => new URL(value).protocol === 'https:'))
+    .min(1).max(10).optional(),
   reviewNote: reviewNoteSchema,
 }).strict();
 

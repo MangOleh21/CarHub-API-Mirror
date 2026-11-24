@@ -237,7 +237,7 @@ test('admin car writes reject Vercel Blob URLs whose contents are not images', a
     },
   });
   globalThis.fetch = async (input, options) => {
-    const url = input instanceof Request ? input.url : input;
+    const url = input instanceof Request ? input.url : String(input);
     if (url === 'https://store.public.blob.vercel-storage.com/cars/not-image.png') {
       return new Response('not an image', {
         status: 206,

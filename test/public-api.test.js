@@ -244,7 +244,7 @@ test('submission endpoint rejects a Vercel Blob URL whose contents are not an im
     },
   });
   globalThis.fetch = async (input, options) => {
-    const url = input instanceof Request ? input.url : input;
+    const url = input instanceof Request ? input.url : String(input);
     if (url === 'https://store.public.blob.vercel-storage.com/submissions/not-image.png') {
       return new Response('not an image', {
         status: 206,
@@ -276,4 +276,71 @@ test('submission endpoint rejects a Vercel Blob URL whose contents are not an im
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('car list accepts transmission, price, year, and sort filters', async () => {
+  let receivedFilters;
+  const app = createTestApp({
+    carModel: {
+      async list(filters) {
+        receivedFilters = filters;
+        return { items: [car], totalItems: 1 };
+      },
+    },
+  });
+
+  const response = await request(
+    app,
+    '/api/cars?transmission=Manual&minPrice=100000000&maxPrice=250000000&minYear=2018&maxYear=2023&sort=price_asc',
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(receivedFilters, {
+    transmission: 'Manual',
+    minPrice: 100000000,
+    maxPrice: 250000000,
+    minYear: 2018,
+    maxYear: 2023,
+    sort: 'price_asc',
+    limit: 20,
+    offset: 0,
+  });
+});
+
+test('submission endpoint accepts multiple images array', async () => {
+  let createdSubmission;
+  const app = createTestApp({
+    submissionModel: {
+      async create(input) {
+        createdSubmission = input;
+        return { id: '10', status: 'pending', createdAt: '2026-11-24' };
+      },
+    },
+  });
+
+  const response = await request(app, '/api/submissions', {
+    method: 'POST',
+    body: {
+      sellerName: 'Ayu',
+      sellerPhone: '+628123456789',
+      brand: 'Honda',
+      model: 'Civic',
+      year: 2021,
+      transmission: 'Manual',
+      mileage: 15_000,
+      expectedPrice: 350_000_000,
+      location: 'Surabaya',
+      images: [
+        'https://example.test/car1.jpg',
+        'https://example.test/car2.jpg',
+      ],
+    },
+  });
+
+  assert.equal(response.status, 201);
+  assert.equal(createdSubmission.imageUrl, 'https://example.test/car1.jpg');
+  assert.deepEqual(createdSubmission.images, [
+    'https://example.test/car1.jpg',
+    'https://example.test/car2.jpg',
+  ]);
 });

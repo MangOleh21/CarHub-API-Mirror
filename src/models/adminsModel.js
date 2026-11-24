@@ -42,14 +42,34 @@ export function createAdminsModel(pool) {
     },
 
     async createAdmin({ email, passwordHash }) {
-      const result = await pool.query(
-        `INSERT INTO admin_users (email, password_hash, role)
-         VALUES ($1, $2, 'admin')
-         ON CONFLICT (email) DO NOTHING
-         RETURNING id::text AS id, email, role, is_active AS "isActive"`,
-        [email, passwordHash],
+      const existing = await pool.query(
+        'SELECT 1 FROM admin_users WHERE LOWER(email) = LOWER($1) LIMIT 1',
+        [email],
       );
-      return result.rows[0] ?? null;
+      if (existing.rowCount > 0) return null;
+
+      try {
+        const result = await pool.query(
+          `INSERT INTO admin_users (email, password_hash, role)
+           VALUES ($1, $2, 'admin')
+           ON CONFLICT DO NOTHING
+           RETURNING id::text AS id, email, role, is_active AS "isActive"`,
+          [email, passwordHash],
+        );
+        return result.rows[0] ?? null;
+      } catch (error) {
+        if (error.code === '23505') return null;
+        throw error;
+      }
+    },
+
+    async listAdmins() {
+      const result = await pool.query(
+        `SELECT id::text AS id, email, role, is_active AS "isActive", created_at AS "createdAt"
+         FROM admin_users
+         ORDER BY role = 'owner' DESC, created_at ASC`,
+      );
+      return result.rows;
     },
 
     async deactivateAdmin(id) {

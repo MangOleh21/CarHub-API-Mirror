@@ -10,6 +10,12 @@ export function registerAdminUsersRoutes(app, { adminModel, allowedOrigins }) {
   const requireAdmin = createRequireAdmin(adminModel);
   const requireTrustedOrigin = createRequireTrustedOrigin(allowedOrigins);
 
+  app.get(
+    '/api/admin/users',
+    requireAdmin,
+    requireOwner,
+    controller.list,
+  );
   app.post(
     '/api/admin/users',
     requireTrustedOrigin,

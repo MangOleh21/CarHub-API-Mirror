@@ -12,9 +12,14 @@ const submissionSchema = z.object({
   mileage: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
   expectedPrice: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   location: z.string().trim().min(1).max(150),
-  imageUrl: z.string().url().refine((value) => new URL(value).protocol === 'https:'),
+  imageUrl: z.string().url().refine((value) => new URL(value).protocol === 'https:').optional(),
+  images: z.array(z.string().url().refine((value) => new URL(value).protocol === 'https:'))
+    .min(1).max(10).optional(),
   description: z.string().trim().max(3_000).optional(),
-}).strict();
+}).strict().refine((data) => Boolean(data.imageUrl || (data.images && data.images.length > 0)), {
+  message: 'Image URL or images array is required',
+  path: ['imageUrl'],
+});
 
 export function createSubmissionController(submissionModel) {
   return async (request, response) => {
@@ -28,16 +33,28 @@ export function createSubmissionController(submissionModel) {
         },
       });
     }
-    if (!await verifyManagedImage(parsedBody.data.imageUrl)) {
-      return response.status(422).json({
-        error: {
-          code: 'INVALID_IMAGE',
-          message: 'Uploaded image must be a valid JPEG, PNG, or WebP file.',
-        },
-      });
+
+    const images = Array.isArray(parsedBody.data.images) && parsedBody.data.images.length > 0
+      ? parsedBody.data.images
+      : (parsedBody.data.imageUrl ? [parsedBody.data.imageUrl] : []);
+    const imageUrl = parsedBody.data.imageUrl || images[0];
+
+    for (const img of images) {
+      if (!await verifyManagedImage(img)) {
+        return response.status(422).json({
+          error: {
+            code: 'INVALID_IMAGE',
+            message: 'Uploaded image must be a valid JPEG, PNG, or WebP file.',
+          },
+        });
+      }
     }
 
-    const submission = await submissionModel.create(parsedBody.data);
+    const submission = await submissionModel.create({
+      ...parsedBody.data,
+      imageUrl,
+      images,
+    });
     return response.status(201).json({ success: true, data: submission });
   };
 }

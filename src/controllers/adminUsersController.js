@@ -16,11 +16,20 @@ function safeAdmin(admin) {
     email: admin.email,
     role: admin.role,
     isActive: admin.isActive,
+    createdAt: admin.createdAt,
   };
 }
 
 export function createAdminUsersController(adminModel) {
   return {
+    list: async (request, response) => {
+      const admins = await adminModel.listAdmins();
+      return response.status(200).json({
+        success: true,
+        data: { admins: admins.map(safeAdmin) },
+      });
+    },
+
     create: async (request, response) => {
       const parsed = createAdminSchema.safeParse(request.body);
       if (!parsed.success) {

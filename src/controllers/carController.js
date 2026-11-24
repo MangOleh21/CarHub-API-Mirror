@@ -6,6 +6,13 @@ const optionalFilter = z.string().trim().max(100).optional()
 const listQuerySchema = z.object({
   search: optionalFilter,
   brand: optionalFilter,
+  transmission: z.enum(['Manual', 'Automatic']).optional(),
+  fuelType: optionalFilter,
+  minPrice: z.coerce.number().int().min(0).optional(),
+  maxPrice: z.coerce.number().int().min(0).optional(),
+  minYear: z.coerce.number().int().min(1886).max(2100).optional(),
+  maxYear: z.coerce.number().int().min(1886).max(2100).optional(),
+  sort: z.enum(['newest', 'price_asc', 'price_desc', 'year_desc', 'mileage_asc']).optional(),
   page: z.coerce.number().int().min(1).max(1_000_000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 }).strict();
