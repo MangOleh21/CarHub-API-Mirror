@@ -45,11 +45,21 @@ export function createAdminsModel(pool) {
       const result = await pool.query(
         `INSERT INTO admin_users (email, password_hash, role)
          VALUES ($1, $2, 'admin')
-         ON CONFLICT (email) DO NOTHING
+         ON CONFLICT DO NOTHING
          RETURNING id::text AS id, email, role, is_active AS "isActive"`,
         [email, passwordHash],
       );
       return result.rows[0] ?? null;
+    },
+
+    async listAdmins() {
+      const result = await pool.query(
+        `SELECT id::text AS id, email, role, is_active AS "isActive",
+                created_at AS "createdAt"
+         FROM admin_users
+         ORDER BY created_at DESC, id DESC`,
+      );
+      return result.rows;
     },
 
     async deactivateAdmin(id) {

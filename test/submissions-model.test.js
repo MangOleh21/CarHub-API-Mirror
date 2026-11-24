@@ -23,6 +23,7 @@ const submission = {
 function createPool(submissionRow) {
   const calls = [];
   let released = false;
+  const reviewedAt = '2026-11-24T00:00:00.000Z';
   const client = {
     async query(sql, values = []) {
       const statement = sql.trim();
@@ -47,6 +48,7 @@ function createPool(submissionRow) {
             status: values[0],
             reviewedByEmail: values[1],
             reviewNote: values[2],
+            reviewedAt,
           }],
           rowCount: 1,
         };
@@ -63,6 +65,7 @@ function createPool(submissionRow) {
     pool: { async connect() { return client; } },
     calls,
     wasReleased: () => released,
+    reviewedAt,
   };
 }
 
@@ -70,9 +73,13 @@ test('approval atomically creates a car and prefers seller data over admin fallb
   const sellerSubmission = {
     ...submission,
     imageUrl: 'https://seller.example/car.jpg',
+    images: [
+      'https://seller.example/car.jpg',
+      'https://seller.example/side.jpg',
+    ],
     location: 'Bandung',
   };
-  const { pool, calls, wasReleased } = createPool(sellerSubmission);
+  const { pool, calls, wasReleased, reviewedAt } = createPool(sellerSubmission);
   const model = createSubmissionsModel(pool);
 
   const result = await model.moderate('5', {
@@ -97,12 +104,18 @@ test('approval atomically creates a car and prefers seller data over admin fallb
       status: 'approved',
       reviewedByEmail: 'admin@example.test',
       reviewNote: 'Review complete.',
+      reviewedAt,
     },
     car: { id: '91' },
   });
   assert.equal(insertCall.values[5], '180000000');
   assert.equal(insertCall.values[6], 'https://seller.example/car.jpg');
-  assert.equal(insertCall.values[9], 'Bandung');
+  assert.deepEqual(insertCall.values[7], sellerSubmission.images);
+  assert.equal(insertCall.values[10], 'Bandung');
+  assert.match(
+    calls.find(({ statement }) => statement.startsWith('UPDATE submissions')).statement,
+    /reviewed_at = NOW\(\)/,
+  );
   assert.ok(lockCall);
   assert.ok(insertIndex < statusUpdateIndex && statusUpdateIndex < commitIndex);
   assert.deepEqual(
@@ -111,6 +124,45 @@ test('approval atomically creates a car and prefers seller data over admin fallb
     ['BEGIN', 'COMMIT'],
   );
   assert.equal(wasReleased(), true);
+});
+
+test('submission model stores the image gallery alongside its first-image alias', async () => {
+  const calls = [];
+  const images = [
+    'https://images.example/car.jpg',
+    'https://images.example/side.jpg',
+  ];
+  const model = createSubmissionsModel({
+    async query(statement, values) {
+      calls.push({ statement, values });
+      return {
+        rows: [{ id: '5', status: 'pending', createdAt: '2026-11-24T00:00:00.000Z' }],
+      };
+    },
+  });
+
+  const result = await model.create({
+    sellerName: 'Ayu',
+    sellerPhone: '628123456789',
+    brand: 'Toyota',
+    model: 'Avanza',
+    year: 2020,
+    transmission: 'Automatic',
+    mileage: 25_000,
+    expectedPrice: 180_000_000,
+    location: 'Jakarta',
+    imageUrl: images[0],
+    images,
+  });
+
+  assert.deepEqual(result, {
+    id: '5',
+    status: 'pending',
+    createdAt: '2026-11-24T00:00:00.000Z',
+  });
+  assert.match(calls[0].statement, /INSERT INTO submissions/);
+  assert.equal(calls[0].values[9], images[0]);
+  assert.deepEqual(calls[0].values[10], images);
 });
 
 test('approval of legacy submission requires missing location or photo before creating a car', async () => {
@@ -147,7 +199,8 @@ test('approval fills missing legacy submission fields from the admin payload', a
   assert.equal(result.submission.reviewedByEmail, 'admin@example.test');
   assert.equal(result.submission.reviewNote, null);
   assert.equal(insertCall.values[6], 'https://images.example/car.jpg');
-  assert.equal(insertCall.values[9], 'Jakarta');
+  assert.deepEqual(insertCall.values[7], ['https://images.example/car.jpg']);
+  assert.equal(insertCall.values[10], 'Jakarta');
 });
 
 test('a submission that is no longer pending cannot create another catalog car', async () => {
@@ -180,6 +233,7 @@ test('rejecting a submission updates its status without creating a catalog car',
       status: 'rejected',
       reviewedByEmail: 'admin@example.test',
       reviewNote: null,
+      reviewedAt: '2026-11-24T00:00:00.000Z',
     },
     car: null,
   });

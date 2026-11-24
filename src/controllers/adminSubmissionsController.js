@@ -11,15 +11,18 @@ const submissionIdSchema = z.string()
   .refine((value) => BigInt(value) <= 9_223_372_036_854_775_807n);
 
 const reviewNoteSchema = z.string().trim().min(1).max(3_000).optional();
+const imageUrlSchema = z.string().url()
+  .refine((value) => new URL(value).protocol === 'https:');
 
 const approvalSchema = z.object({
   location: z.string().trim().min(1).max(150).optional(),
-  imageUrl: z.string()
-    .url()
-    .refine((value) => new URL(value).protocol === 'https:')
-    .optional(),
+  imageUrl: imageUrlSchema.optional(),
+  images: z.array(imageUrlSchema).min(1).max(10).optional(),
   reviewNote: reviewNoteSchema,
-}).strict();
+}).strict().refine(
+  ({ imageUrl, images }) => !imageUrl || !images || imageUrl === images[0],
+  { path: ['imageUrl'], message: 'imageUrl must match the first image' },
+);
 
 const rejectionSchema = z.object({
   reviewNote: reviewNoteSchema,

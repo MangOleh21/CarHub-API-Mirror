@@ -171,6 +171,7 @@ test('admin can approve a submission with a server-recorded reviewer and optiona
             status: 'approved',
             reviewedByEmail: input.reviewedByEmail,
             reviewNote: input.reviewNote,
+            reviewedAt: '2026-11-24T00:00:00.000Z',
           },
           car: { id: '91' },
         };
@@ -185,7 +186,10 @@ test('admin can approve a submission with a server-recorded reviewer and optiona
       origin,
       body: {
         location: 'Jakarta',
-        imageUrl: 'https://images.example/car.jpg',
+        images: [
+          'https://images.example/car.jpg',
+          'https://images.example/car-side.jpg',
+        ],
         reviewNote: 'Dokumen dan kondisi kendaraan sudah diperiksa.',
       },
     });
@@ -197,7 +201,10 @@ test('admin can approve a submission with a server-recorded reviewer and optiona
       reviewedByEmail: 'admin@example.test',
       reviewNote: 'Dokumen dan kondisi kendaraan sudah diperiksa.',
       location: 'Jakarta',
-      imageUrl: 'https://images.example/car.jpg',
+      images: [
+        'https://images.example/car.jpg',
+        'https://images.example/car-side.jpg',
+      ],
     });
     assert.deepEqual(response.body.data, {
       submission: {
@@ -205,6 +212,7 @@ test('admin can approve a submission with a server-recorded reviewer and optiona
         status: 'approved',
         reviewedByEmail: 'admin@example.test',
         reviewNote: 'Dokumen dan kondisi kendaraan sudah diperiksa.',
+        reviewedAt: '2026-11-24T00:00:00.000Z',
       },
       car: { id: '91' },
     });

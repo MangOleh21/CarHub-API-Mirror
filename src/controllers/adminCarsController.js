@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { verifyManagedImage } from '../services/verify-image.js';
 
+const imageUrlSchema = z.string().url()
+  .refine((value) => new URL(value).protocol === 'https:');
+
 const carInputSchema = z.object({
   brand: z.string().trim().min(1).max(100),
   model: z.string().trim().min(1).max(100),
@@ -9,14 +12,27 @@ const carInputSchema = z.object({
   fuelType: z.string().trim().min(1).max(50).default('Bensin'),
   mileage: z.number().int().min(0).max(2_147_483_647),
   price: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-  imageUrl: z.string().url()
-    .refine((value) => new URL(value).protocol === 'https:'),
+  imageUrl: imageUrlSchema.optional(),
+  images: z.array(imageUrlSchema).min(1).max(10).optional(),
   sellerName: z.string().trim().min(1).max(150),
   sellerPhone: z.string().trim().regex(/^\+?[0-9][0-9\s()-]{7,19}$/),
   location: z.string().trim().min(1).max(150),
   description: z.string().trim().max(3_000).nullable().optional()
     .transform((value) => value ?? null),
-}).strict();
+}).strict()
+  .refine(
+    ({ imageUrl, images }) => Boolean(images?.length || imageUrl),
+    { path: ['images'], message: 'At least one image is required' },
+  )
+  .refine(
+    ({ imageUrl, images }) => !imageUrl || !images || imageUrl === images[0],
+    { path: ['imageUrl'], message: 'imageUrl must match the first image' },
+  )
+  .transform(({ imageUrl, images, ...input }) => ({
+    ...input,
+    images: images ?? [imageUrl],
+    imageUrl: imageUrl ?? images[0],
+  }));
 
 const carIdSchema = z.string()
   .regex(/^[1-9]\d{0,18}$/)
@@ -48,7 +64,7 @@ export function createAdminCarsController(carModel) {
       if (!parsed.success) {
         return validationError(response, parsed.error, 'Invalid car data');
       }
-      if (!await verifyManagedImage(parsed.data.imageUrl)) {
+      if (!(await Promise.all(parsed.data.images.map(verifyManagedImage))).every(Boolean)) {
         return response.status(422).json({
           error: {
             code: 'INVALID_IMAGE',
@@ -71,7 +87,7 @@ export function createAdminCarsController(carModel) {
       if (!parsed.success) {
         return validationError(response, parsed.error, 'Invalid car data');
       }
-      if (!await verifyManagedImage(parsed.data.imageUrl)) {
+      if (!(await Promise.all(parsed.data.images.map(verifyManagedImage))).every(Boolean)) {
         return response.status(422).json({
           error: {
             code: 'INVALID_IMAGE',

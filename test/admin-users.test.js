@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { test } from 'node:test';
 import { createApp } from '../src/app.js';
 import { hashPassword, verifyPassword } from '../src/auth/password.js';
+import { createAdminsModel } from '../src/models/adminsModel.js';
 
 const origin = 'http://localhost:5173';
 const loginPassword = 'a long admin password';
@@ -59,6 +60,68 @@ async function login(client, email = 'owner@example.test') {
   assert.equal(response.status, 200);
   return response.setCookie.split(';')[0];
 }
+
+test('owner can list admin accounts without exposing password hashes', async () => {
+  const owner = {
+    id: '1',
+    email: 'owner@example.test',
+    role: 'owner',
+    isActive: true,
+    passwordHash: await hashPassword(loginPassword),
+  };
+  const admins = [
+    { id: '2', email: 'admin@example.test', role: 'admin', isActive: true, createdAt: '2026-11-20T00:00:00.000Z' },
+  ];
+  const adminRepository = {
+    async findUserByEmail(email) {
+      return email === owner.email ? owner : null;
+    },
+    async createSession() {},
+    async getActiveSession() { return owner; },
+    async listAdmins() { return admins; },
+  };
+  const client = await createClient(createApp(createModels(adminRepository)));
+
+  try {
+    const unauthenticated = await client.request('/api/admin/users');
+    assert.equal(unauthenticated.status, 401);
+
+    const cookie = await login(client);
+    const response = await client.request('/api/admin/users', { cookie });
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.data, admins);
+    assert.equal(JSON.stringify(response.body).includes('passwordHash'), false);
+  } finally {
+    await client.close();
+  }
+});
+
+test('admin role cannot list admin accounts', async () => {
+  const admin = {
+    id: '2',
+    email: 'admin@example.test',
+    role: 'admin',
+    isActive: true,
+    passwordHash: await hashPassword(loginPassword),
+  };
+  const adminRepository = {
+    async findUserByEmail(email) {
+      return email === admin.email ? admin : null;
+    },
+    async createSession() {},
+    async getActiveSession() { return admin; },
+    async listAdmins() { assert.fail('Only owner can list admin accounts'); },
+  };
+  const client = await createClient(createApp(createModels(adminRepository)));
+
+  try {
+    const cookie = await login(client, admin.email);
+    const response = await client.request('/api/admin/users', { cookie });
+    assert.equal(response.status, 403);
+  } finally {
+    await client.close();
+  }
+});
 
 test('owner can create an admin without exposing its password hash', async () => {
   const owner = {
@@ -233,4 +296,23 @@ test('owner can deactivate an admin but the owner account cannot be deactivated'
   } finally {
     await client.close();
   }
+});
+
+test('admin model handles unique conflicts without targeting a case-sensitive constraint', async () => {
+  let insertSql;
+  const model = createAdminsModel({
+    async query(sql) {
+      insertSql = sql;
+      return { rows: [] };
+    },
+  });
+
+  const result = await model.createAdmin({
+    email: 'admin@example.test',
+    passwordHash: 'hashed-password',
+  });
+
+  assert.equal(result, null);
+  assert.match(insertSql, /ON CONFLICT DO NOTHING/);
+  assert.doesNotMatch(insertSql, /ON CONFLICT\s*\(email\)/i);
 });

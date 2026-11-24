@@ -94,6 +94,8 @@ test('admin can list and read cars but public access does not bypass admin authe
     });
     assert.equal(list.status, 200);
     assert.deepEqual(receivedFilters, {
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
       limit: 5,
       offset: 5,
     });
@@ -130,6 +132,35 @@ test('admin can create a car with validated catalog fields', async () => {
     assert.equal(receivedInput.fuelType, 'Bensin');
     assert.equal(receivedInput.description, null);
     assert.deepEqual(response.body.data, car);
+  } finally {
+    await client.close();
+  }
+});
+
+test('admin can save a gallery while retaining the first-image compatibility field', async () => {
+  let receivedInput;
+  const images = [
+    'https://images.example/car.jpg',
+    'https://images.example/car-side.jpg',
+  ];
+  const client = await createClient({
+    async create(input) {
+      receivedInput = input;
+      return car;
+    },
+  });
+
+  try {
+    const response = await client.request('/api/admin/cars', {
+      method: 'POST',
+      cookie: sessionCookie,
+      origin,
+      body: { ...carInput, imageUrl: images[0], images },
+    });
+
+    assert.equal(response.status, 201);
+    assert.deepEqual(receivedInput.images, images);
+    assert.equal(receivedInput.imageUrl, images[0]);
   } finally {
     await client.close();
   }

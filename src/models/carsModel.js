@@ -8,6 +8,10 @@ const carColumns = `
   mileage,
   price::text AS price,
   image_url AS "imageUrl",
+  CASE
+    WHEN cardinality(images) > 0 THEN images
+    ELSE ARRAY[image_url]
+  END AS images,
   seller_name AS "sellerName",
   seller_phone AS "sellerPhone",
   location,
@@ -17,7 +21,19 @@ const carColumns = `
 
 export function createCarsModel(pool) {
   return {
-    async list({ search, brand, limit, offset }) {
+    async list({
+      search,
+      brand,
+      transmission,
+      minPrice,
+      maxPrice,
+      minYear,
+      maxYear,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      limit,
+      offset,
+    }) {
       const filters = [];
       const values = [];
 
@@ -31,6 +47,19 @@ export function createCarsModel(pool) {
         filters.push(`brand ILIKE $${values.length}`);
       }
 
+      for (const [column, operator, value] of [
+        ['transmission', '=', transmission],
+        ['price', '>=', minPrice],
+        ['price', '<=', maxPrice],
+        ['year', '>=', minYear],
+        ['year', '<=', maxYear],
+      ]) {
+        if (value !== undefined) {
+          values.push(value);
+          filters.push(`${column} ${operator} $${values.length}`);
+        }
+      }
+
       const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
       const countResult = await pool.query(
         `SELECT COUNT(*)::text AS count FROM cars ${whereClause}`,
@@ -38,11 +67,18 @@ export function createCarsModel(pool) {
       );
       const totalItems = Number(countResult.rows[0].count);
       const pageValues = [...values, limit, offset];
+      const sortColumns = {
+        createdAt: 'created_at',
+        price: 'price',
+        year: 'year',
+      };
+      const sortColumn = sortColumns[sortBy];
+      const direction = sortOrder.toUpperCase();
       const result = await pool.query(
         `SELECT ${carColumns}
          FROM cars
          ${whereClause}
-         ORDER BY created_at DESC, id DESC
+         ORDER BY ${sortColumn} ${direction}, id ${direction}
          LIMIT $${pageValues.length - 1} OFFSET $${pageValues.length}`,
         pageValues,
       );
@@ -69,12 +105,13 @@ export function createCarsModel(pool) {
            mileage,
            price,
            image_url,
+           images,
            seller_name,
            seller_phone,
            location,
            description
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          RETURNING ${carColumns}`,
         [
           input.brand,
@@ -85,6 +122,7 @@ export function createCarsModel(pool) {
           input.mileage,
           input.price,
           input.imageUrl,
+          input.images,
           input.sellerName,
           input.sellerPhone,
           input.location,
@@ -105,11 +143,12 @@ export function createCarsModel(pool) {
              mileage = $6,
              price = $7,
              image_url = $8,
-             seller_name = $9,
-             seller_phone = $10,
-             location = $11,
-             description = $12
-         WHERE id = $13
+             images = $9,
+             seller_name = $10,
+             seller_phone = $11,
+             location = $12,
+             description = $13
+         WHERE id = $14
          RETURNING ${carColumns}`,
         [
           input.brand,
@@ -120,6 +159,7 @@ export function createCarsModel(pool) {
           input.mileage,
           input.price,
           input.imageUrl,
+          input.images,
           input.sellerName,
           input.sellerPhone,
           input.location,

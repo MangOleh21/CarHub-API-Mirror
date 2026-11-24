@@ -85,6 +85,8 @@ test('car list validates filters and returns paginated results', async () => {
   assert.deepEqual(receivedFilters, {
     search: 'toyota',
     brand: 'Toyota',
+    sortBy: 'createdAt',
+    sortOrder: 'desc',
     limit: 10,
     offset: 10,
   });
@@ -98,6 +100,39 @@ test('car list validates filters and returns paginated results', async () => {
       totalPages: 2,
     },
   });
+});
+
+test('car list accepts range filters and sorting and rejects inverted ranges', async () => {
+  let receivedFilters;
+  const app = createTestApp({
+    carModel: {
+      async list(filters) {
+        receivedFilters = filters;
+        return { items: [car], totalItems: 1 };
+      },
+    },
+  });
+
+  const response = await request(
+    app,
+    '/api/cars?minPrice=100000000&maxPrice=200000000&minYear=2018&maxYear=2022&transmission=Automatic&sortBy=price&sortOrder=asc',
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(receivedFilters, {
+    transmission: 'Automatic',
+    minPrice: 100_000_000,
+    maxPrice: 200_000_000,
+    minYear: 2018,
+    maxYear: 2022,
+    sortBy: 'price',
+    sortOrder: 'asc',
+    limit: 20,
+    offset: 0,
+  });
+
+  const invalidRange = await request(app, '/api/cars?minPrice=200&maxPrice=100');
+  assert.equal(invalidRange.status, 422);
+  assert.equal(invalidRange.body.error.code, 'VALIDATION_ERROR');
 });
 
 test('car detail returns 404 when the repository has no matching car', async () => {
@@ -160,7 +195,10 @@ test('submission endpoint validates input and returns the pending submission', a
       mileage: 25_000,
       expectedPrice: 180_000_000,
       location: 'Jakarta',
-      imageUrl: 'https://images.example/car.jpg',
+      images: [
+        'https://images.example/car.jpg',
+        'https://images.example/car-side.jpg',
+      ],
       description: 'Terawat',
     },
   });
@@ -169,6 +207,10 @@ test('submission endpoint validates input and returns the pending submission', a
   assert.equal(receivedInput.sellerName, 'Ayu');
   assert.equal(receivedInput.location, 'Jakarta');
   assert.equal(receivedInput.imageUrl, 'https://images.example/car.jpg');
+  assert.deepEqual(receivedInput.images, [
+    'https://images.example/car.jpg',
+    'https://images.example/car-side.jpg',
+  ]);
   assert.equal(response.body.data.status, 'pending');
 });
 

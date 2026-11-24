@@ -61,7 +61,7 @@ Lihat [dokumentasi lengkap API](./docs/API_DOCUMENTATION.md) untuk skema request
 | Method dan path | Keterangan |
 |---|---|
 | `GET /api/health` | Status API |
-| `GET /api/cars?search=&brand=&page=1&pageSize=20` | Daftar mobil terpaginasikan; `search`, `brand`, `page`, dan `pageSize` opsional |
+| `GET /api/cars?search=&brand=&transmission=&minPrice=&maxPrice=&minYear=&maxYear=&sortBy=createdAt&sortOrder=desc&page=1&pageSize=20` | Daftar mobil terpaginasikan dengan filter dan pengurutan |
 | `GET /api/cars/:id` | Detail mobil |
 | `POST /api/uploads/submissions` | Meminta field upload bertanda tangan untuk foto pengajuan |
 | `POST /api/submissions` | Mengirim pengajuan jual mobil; membuat submission berstatus `pending` |
@@ -78,12 +78,15 @@ Contoh body `POST /api/submissions`:
   "transmission": "Automatic",
   "mileage": 25000,
   "expectedPrice": 180000000,
-  "imageUrl": "https://images.example.test/car.jpg",
+  "images": [
+    "https://images.example.test/car.jpg",
+    "https://images.example.test/car-side.jpg"
+  ],
   "description": "Kondisi terawat"
 }
 ```
 
-`location` dan `imageUrl` wajib; URL foto harus menggunakan HTTPS. `description` opsional. Foto disimpan sebagai URL, bukan file di database.
+`location` dan satu hingga sepuluh URL foto HTTPS pada `images` wajib. Field lama `imageUrl` tunggal tetap diterima untuk kompatibilitas. `description` opsional. Foto disimpan sebagai URL, bukan file di database.
 
 ### Admin
 
@@ -94,7 +97,7 @@ Admin login memakai cookie sesi HttpOnly; jangan mengirim token lewat LocalStora
 | `POST /api/admin/auth/login` | Publik, dibatasi laju | Login dengan `email` dan `password` (minimal 12 karakter) |
 | `GET /api/admin/auth/session` | Admin terautentikasi | Memeriksa sesi aktif |
 | `POST /api/admin/auth/logout` | Origin tepercaya | Mencabut sesi dan menghapus cookie |
-| `GET /api/admin/cars?search=&brand=&page=1&pageSize=20` | Admin terautentikasi | Daftar mobil terpaginasikan untuk pengelolaan |
+| `GET /api/admin/cars?...` | Admin terautentikasi | Daftar mobil terpaginasikan dengan filter dan pengurutan katalog |
 | `GET /api/admin/cars/:id` | Admin terautentikasi | Detail mobil |
 | `POST /api/admin/uploads/cars` | Admin terautentikasi + Origin tepercaya | Meminta field upload bertanda tangan untuk foto mobil |
 | `POST /api/admin/cars` | Admin terautentikasi + Origin tepercaya | Membuat mobil katalog |
@@ -103,12 +106,13 @@ Admin login memakai cookie sesi HttpOnly; jangan mengirim token lewat LocalStora
 | `GET /api/admin/submissions?status=pending&page=1&pageSize=20` | Admin terautentikasi | Daftar submission terpaginasikan; status default `pending`, filter menerima `pending`, `approved`, `rejected`, atau `all` untuk semua status |
 | `PATCH /api/admin/submissions/:id/approved` | Admin terautentikasi + Origin tepercaya | Menyetujui dan membuat mobil katalog secara atomik |
 | `PATCH /api/admin/submissions/:id/rejected` | Admin terautentikasi + Origin tepercaya | Menolak submission tanpa membuat mobil katalog |
+| `GET /api/admin/users` | Owner | Mendaftar akun owner/admin aktif dan nonaktif tanpa password/hash |
 | `POST /api/admin/users` | Owner | Membuat akun ber-role `admin`; body berisi `email` dan `password` |
 | `PATCH /api/admin/users/:id/deactivate` | Owner | Menonaktifkan akun admin aktif |
 
-Password admin harus 12–128 karakter. Body `POST` dan `PUT` mobil menerima `brand`, `model`, `year`, `transmission`, `fuelType`, `mileage`, `price`, `imageUrl`, `sellerName`, `sellerPhone`, `location`, dan `description`. `fuelType` default ke `Bensin`, `description` boleh `null` atau tidak dikirim, dan URL gambar wajib HTTPS. Karena `PUT` mengganti seluruh data, field yang tidak dikirim akan memakai default atau dikosongkan sesuai aturan tersebut. `DELETE` menghapus baris mobil secara permanen.
+Password admin harus 12–128 karakter. Body `POST` dan `PUT` mobil menerima `brand`, `model`, `year`, `transmission`, `fuelType`, `mileage`, `price`, `images` (1–10 URL HTTPS; atau `imageUrl` lama untuk satu foto), `sellerName`, `sellerPhone`, `location`, dan `description`. `fuelType` default ke `Bensin`, `description` boleh `null` atau tidak dikirim. Karena `PUT` mengganti seluruh data, field yang tidak dikirim akan memakai default atau dikosongkan sesuai aturan tersebut. `DELETE` menghapus baris mobil secara permanen.
 
-Body kedua endpoint menerima `reviewNote` opsional (maksimal 3.000 karakter). Untuk approval, `location` dan/atau `imageUrl` juga dapat dikirim jika data submission lama belum memilikinya; data yang sudah diberikan penjual tetap dipakai. Email reviewer diambil dari sesi admin dan tidak dapat ditentukan melalui body. Submission yang sudah tidak berstatus `pending` tidak dapat diproses kembali (`409`). Data lama tidak di-backfill; kolom review-nya tetap `NULL`, sedangkan keputusan baru menyimpan email reviewer dan catatan jika diberikan.
+Body kedua endpoint menerima `reviewNote` opsional (maksimal 3.000 karakter). Untuk approval, `location` dan/atau `images` juga dapat dikirim jika submission lama belum memilikinya; data yang sudah diberikan penjual tetap dipakai. Email reviewer diambil dari sesi admin dan tidak dapat ditentukan melalui body. Submission yang sudah tidak berstatus `pending` tidak dapat diproses kembali (`409`). Keputusan baru menyimpan email reviewer, catatan, dan `reviewedAt`; nilai historis pada database development dapat memakai `created_at` sebagai perkiraan.
 
 Contoh body (catatan dapat dihilangkan):
 
@@ -120,12 +124,12 @@ Kirim body yang sama ke `/api/admin/submissions/:id/approved` atau `/api/admin/s
 
 ## Skema database
 
-Migration berada di `migrations/001_initial_schema.sql`, `migrations/002_add_submission_location.sql`, dan `migrations/003_add_submission_review_details.sql`. Kolom `submissions.location`, `reviewed_by_email`, dan `review_note` nullable agar data lama tetap valid; API submission baru mewajibkan lokasi dan foto.
+Migration berada di `migrations/001_initial_schema.sql` hingga `migrations/004_add_car_images_and_reviewed_at.sql`. Migration `004` menambahkan `images` pada mobil dan submission, mengisi foto pertama dari `image_url` lama, dan menambahkan `submissions.reviewed_at`.
 
 | Tabel | Kolom utama |
 |---|---|
-| `cars` | `id`, `brand`, `model`, `year`, `transmission`, `fuel_type`, `mileage`, `price`, `image_url`, `seller_name`, `seller_phone`, `location`, `description`, `created_at` |
-| `submissions` | `id`, `seller_name`, `seller_phone`, `brand`, `model`, `year`, `transmission`, `mileage`, `expected_price`, `image_url`, `location`, `description`, `status`, `reviewed_by_email`, `review_note`, `created_at` |
+| `cars` | `id`, `brand`, `model`, `year`, `transmission`, `fuel_type`, `mileage`, `price`, `image_url`, `images`, `seller_name`, `seller_phone`, `location`, `description`, `created_at` |
+| `submissions` | `id`, `seller_name`, `seller_phone`, `brand`, `model`, `year`, `transmission`, `mileage`, `expected_price`, `image_url`, `images`, `location`, `description`, `status`, `reviewed_by_email`, `review_note`, `reviewed_at`, `created_at` |
 | `admin_users` | `id`, `email`, `password_hash`, `role` (`owner` atau `admin`), `is_active`, `created_at` |
 | `admin_sessions` | `id`, `admin_user_id`, `token_hash`, `expires_at`, `revoked_at`, `created_at` |
 
@@ -135,7 +139,7 @@ ID database bertipe `BIGINT` dan dikirim API sebagai string agar tidak kehilanga
 
 Import `postman/PPB_API_Postman_Collection.json` dan `postman/PPB_API_Postman_Environment.json`. Pilih environment **CarHub Local**, lalu isi variabel kredensial admin jika ingin menjalankan request admin. Host dan port API bisa diubah melalui `apiHost` dan `apiPort`.
 
-Untuk menguji upload gambar, buka folder **Public API** dan jalankan **Request submission image upload URL**. Atur `uploadContentType` dan `uploadFileSizeBytes` sesuai file, lalu jalankan **Upload submission image to Cloudinary** dan pilih file yang sama pada bagian Body > form-data. Foto yang berhasil akan menjadi aset publik di Cloudinary dan tidak dihapus oleh collection, jadi gunakan hanya akun local/development. Salin `submissionImageUrl` dari environment ke field `imageUrl` pada request **Create car submission** jika ingin membuat submission dengan foto tersebut. Batas 5 MiB divalidasi UI dan API berdasarkan ukuran yang dilaporkan klien; signed direct upload tidak dapat memaksakan batas ukuran file di Cloudinary. Rincian kontrak ada di [dokumentasi API](./docs/API_DOCUMENTATION.md#post-apiuploadssubmissions).
+Untuk menguji upload gambar, buka folder **Public API** dan jalankan **Request submission image upload URL** sekali untuk setiap foto. Atur `uploadContentType` dan `uploadFileSizeBytes` sesuai file, lalu jalankan **Upload submission image to Cloudinary** dan pilih file yang sama pada bagian Body > form-data. Foto yang berhasil akan menjadi aset publik di Cloudinary dan tidak dihapus oleh collection, jadi gunakan hanya akun local/development. Masukkan URL berurutan pada field `images` request **Create car submission**. Batas 5 MiB divalidasi UI dan API berdasarkan ukuran yang dilaporkan klien; signed direct upload tidak dapat memaksakan batas ukuran file di Cloudinary. Rincian kontrak ada di [dokumentasi API](./docs/API_DOCUMENTATION.md#post-apiuploadssubmissions).
 
 Collection juga dapat membuat dan menghapus mobil uji, serta mengirim dan mengapprove submission; gunakan hanya pada database local/development.
 

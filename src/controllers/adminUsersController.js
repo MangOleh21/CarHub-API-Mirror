@@ -21,6 +21,17 @@ function safeAdmin(admin) {
 
 export function createAdminUsersController(adminModel) {
   return {
+    list: async (_request, response) => {
+      const admins = await adminModel.listAdmins();
+      return response.status(200).json({
+        success: true,
+        data: admins.map((admin) => ({
+          ...safeAdmin(admin),
+          createdAt: admin.createdAt,
+        })),
+      });
+    },
+
     create: async (request, response) => {
       const parsed = createAdminSchema.safeParse(request.body);
       if (!parsed.success) {

@@ -2,6 +2,9 @@ import { z } from 'zod';
 import { verifyManagedImage } from '../services/verify-image.js';
 
 const currentYear = new Date().getFullYear();
+const imageUrlSchema = z.string().url()
+  .refine((value) => new URL(value).protocol === 'https:');
+
 const submissionSchema = z.object({
   sellerName: z.string().trim().min(1).max(150),
   sellerPhone: z.string().trim().regex(/^\+?[0-9][0-9\s()-]{7,19}$/),
@@ -12,9 +15,23 @@ const submissionSchema = z.object({
   mileage: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
   expectedPrice: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   location: z.string().trim().min(1).max(150),
-  imageUrl: z.string().url().refine((value) => new URL(value).protocol === 'https:'),
+  imageUrl: imageUrlSchema.optional(),
+  images: z.array(imageUrlSchema).min(1).max(10).optional(),
   description: z.string().trim().max(3_000).optional(),
-}).strict();
+}).strict()
+  .refine(
+    ({ imageUrl, images }) => Boolean(images?.length || imageUrl),
+    { path: ['images'], message: 'At least one image is required' },
+  )
+  .refine(
+    ({ imageUrl, images }) => !imageUrl || !images || imageUrl === images[0],
+    { path: ['imageUrl'], message: 'imageUrl must match the first image' },
+  )
+  .transform(({ imageUrl, images, ...input }) => ({
+    ...input,
+    images: images ?? [imageUrl],
+    imageUrl: imageUrl ?? images[0],
+  }));
 
 export function createSubmissionController(submissionModel) {
   return async (request, response) => {
@@ -28,7 +45,7 @@ export function createSubmissionController(submissionModel) {
         },
       });
     }
-    if (!await verifyManagedImage(parsedBody.data.imageUrl)) {
+    if (!(await Promise.all(parsedBody.data.images.map(verifyManagedImage))).every(Boolean)) {
       return response.status(422).json({
         error: {
           code: 'INVALID_IMAGE',

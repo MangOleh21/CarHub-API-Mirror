@@ -22,7 +22,8 @@ Untuk deployment, ganti dengan URL API yang dikonfigurasi. Jangan pernah mengiri
 - ID database `BIGINT` selalu dikirim sebagai string.
 - `price` dan `expectedPrice` juga dikirim sebagai string dalam objek respons agar nilainya tetap presisi. Dalam request, keduanya dikirim sebagai JSON number.
 - Waktu `createdAt` dikirim sebagai timestamp ISO 8601.
-- Field dengan nilai `null` dapat muncul pada data lama, khususnya `location`, `imageUrl`, `reviewedByEmail`, dan `reviewNote` pada submission.
+- Field dengan nilai `null` dapat muncul pada data lama, khususnya `location`, `imageUrl`, `reviewedByEmail`, `reviewNote`, dan `reviewedAt` pada submission.
+- `images` berisi URL gambar berurutan; `imageUrl` tetap tersedia sebagai alias gambar pertama untuk kompatibilitas.
 
 ### Pagination dan filter katalog
 
@@ -32,10 +33,15 @@ Untuk deployment, ganti dengan URL API yang dikonfigurasi. Jangan pernah mengiri
 |---|---|---:|---|
 | `search` | string | — | Maksimal 100 karakter; pencarian sebagian tanpa membedakan kapital pada brand atau model |
 | `brand` | string | — | Maksimal 100 karakter; pencocokan brand tanpa membedakan kapital |
+| `transmission` | string | — | `Manual` atau `Automatic` |
+| `minPrice`, `maxPrice` | integer | — | Rentang harga inklusif, positif, dan maksimal `Number.MAX_SAFE_INTEGER`; nilai minimum tidak boleh melebihi maksimum |
+| `minYear`, `maxYear` | integer | — | Rentang tahun inklusif 1886–2100; nilai minimum tidak boleh melebihi maksimum |
+| `sortBy` | string | `createdAt` | `createdAt`, `price`, atau `year` |
+| `sortOrder` | string | `desc` | `asc` atau `desc` |
 | `page` | integer | `1` | Rentang 1–1.000.000 |
 | `pageSize` | integer | `20` | Rentang 1–100 |
 
-Filter `search` dan `brand`, jika dipakai bersamaan, harus cocok keduanya. Hasil katalog diurutkan dari data terbaru. Parameter yang tidak dikenal atau nilai di luar aturan menghasilkan `422`. Respons daftar menggunakan bentuk:
+Filter `search`, `brand`, transmisi, dan rentang harga/tahun yang digunakan bersamaan harus cocok semuanya. Parameter sort memakai kolom yang diizinkan server; jika nilai harga/tahun sama, ID menjadi pemecah urutan. Parameter yang tidak dikenal atau nilai di luar aturan menghasilkan `422`. Respons daftar menggunakan bentuk:
 
 ```json
 {
@@ -108,6 +114,10 @@ Mengambil detail satu mobil. `id` harus berupa bilangan bulat positif yang sesua
     "mileage": 25000,
     "price": "180000000",
     "imageUrl": "https://images.example.test/car.jpg",
+    "images": [
+      "https://images.example.test/car.jpg",
+      "https://images.example.test/car-side.jpg"
+    ],
     "sellerName": "Ayu",
     "sellerPhone": "+6281234567890",
     "location": "Bandung",
@@ -139,12 +149,15 @@ Mengirim pengajuan penjualan mobil. Endpoint ini publik dan membuat submission d
   "mileage": 25000,
   "expectedPrice": 180000000,
   "location": "Bandung",
-  "imageUrl": "https://images.example.test/car.jpg",
+  "images": [
+    "https://images.example.test/car.jpg",
+    "https://images.example.test/car-side.jpg"
+  ],
   "description": "Kondisi terawat"
 }
 ```
 
-Semua field wajib kecuali `description`. `imageUrl` wajib memakai HTTPS.
+Semua field wajib kecuali `description`. Kirim `images` berisi 1–10 URL HTTPS; `imageUrl` tunggal masih diterima untuk kompatibilitas dan menjadi gambar pertama.
 
 | Field | Tipe | Aturan |
 |---|---|---|
@@ -157,7 +170,8 @@ Semua field wajib kecuali `description`. `imageUrl` wajib memakai HTTPS.
 | `mileage` | integer | Validator request menerima 0 sampai `Number.MAX_SAFE_INTEGER`, tetapi kolom database bertipe `INT`; nilai di atas 2.147.483.647 dapat gagal disimpan dan menghasilkan `500`. Batas praktis saat ini: 2.147.483.647 |
 | `expectedPrice` | integer | Wajib, positif dan tidak melebihi `Number.MAX_SAFE_INTEGER` |
 | `location` | string | Wajib, 1–150 karakter setelah trim |
-| `imageUrl` | URL | Wajib, URL valid dengan skema `https:` |
+| `images` | array URL | Wajib untuk beberapa foto, 1–10 URL valid dengan skema `https:` |
+| `imageUrl` | URL | Bentuk kompatibilitas satu foto; URL valid dengan skema `https:` |
 | `description` | string | Opsional, maksimal 3.000 karakter; boleh dihilangkan |
 
 Body bersifat strict; field tambahan yang tidak dikenal akan ditolak.
@@ -213,7 +227,7 @@ Meminta URL bertanda tangan dan field upload untuk mengirim satu foto pengajuan 
 }
 ```
 
-Kirim file menggunakan `multipart/form-data` dengan method `POST` ke `uploadUrl`. Sertakan field `file` dan semua pasangan nama/nilai dari `uploadFields`. Cloudinary mengembalikan `secure_url`; gunakan URL itu sebagai `imageUrl` pada `POST /api/submissions`. API secret tidak pernah dikirim ke browser. Upload preset harus bertipe signed dan host API upload tetap `api.cloudinary.com`.
+Kirim setiap file menggunakan `multipart/form-data` dengan method `POST` ke `uploadUrl`. Sertakan field `file` dan semua pasangan nama/nilai dari `uploadFields`; minta signature upload terpisah untuk tiap file. Cloudinary mengembalikan `secure_url`; kirim URL berurutan di `images` pada `POST /api/submissions`. API secret tidak pernah dikirim ke browser. Upload preset harus bertipe signed dan host API upload tetap `api.cloudinary.com`.
 
 **Respons error:** `403 FORBIDDEN` jika Origin tidak diizinkan, `422 VALIDATION_ERROR` jika tipe konten/ukuran deklaratif tidak valid, `429 RATE_LIMITED` jika batas request tercapai, atau `500 INTERNAL_ERROR` jika konfigurasi/signature gagal.
 
@@ -324,6 +338,10 @@ Membuat mobil baru di katalog. Wajib mengirim body lengkap sesuai [Car input](#c
     "mileage": 25000,
     "price": "180000000",
     "imageUrl": "https://images.example.test/car.jpg",
+    "images": [
+      "https://images.example.test/car.jpg",
+      "https://images.example.test/car-side.jpg"
+    ],
     "sellerName": "Ayu",
     "sellerPhone": "+6281234567890",
     "location": "Bandung",
@@ -366,7 +384,8 @@ Body `POST` dan `PUT` harus berupa object strict dengan field berikut:
 | `fuelType` | string | Opsional, 1–50 karakter; default `Bensin` |
 | `mileage` | integer | Wajib, 0–2.147.483.647 |
 | `price` | integer | Wajib, positif dan tidak melebihi `Number.MAX_SAFE_INTEGER` |
-| `imageUrl` | URL | Wajib, URL valid dengan skema `https:` |
+| `images` | array URL | Wajib untuk beberapa foto, 1–10 URL valid dengan skema `https:` |
+| `imageUrl` | URL | Bentuk kompatibilitas satu foto; URL valid dengan skema `https:` |
 | `sellerName` | string | Wajib, 1–150 karakter setelah trim |
 | `sellerPhone` | string | Wajib; opsional `+`, lalu digit, diikuti 7–19 digit/spasi/`(`/`)`/`-` |
 | `location` | string | Wajib, 1–150 karakter setelah trim |
@@ -406,11 +425,14 @@ Untuk submission lama yang belum mempunyai lokasi/foto, body dapat mengisi nilai
 {
   "reviewNote": "Data kendaraan telah diperiksa.",
   "location": "Bandung",
-  "imageUrl": "https://images.example.test/car.jpg"
+  "images": [
+    "https://images.example.test/car.jpg",
+    "https://images.example.test/car-side.jpg"
+  ]
 }
 ```
 
-`reviewNote`, `location`, dan `imageUrl` opsional. `reviewNote` jika dikirim harus berisi 1–3.000 karakter setelah trim. `imageUrl` harus HTTPS. `location` harus berisi 1–150 karakter setelah trim. Body bersifat strict.
+`reviewNote`, `location`, `imageUrl`, dan `images` opsional. Untuk submission lama yang belum mempunyai foto, `imageUrl` tunggal atau `images` 1–10 URL HTTPS dapat diberikan. `reviewNote` jika dikirim harus berisi 1–3.000 karakter setelah trim. `location` harus berisi 1–150 karakter setelah trim. Body bersifat strict.
 
 **Respons `200`:**
 
@@ -422,7 +444,8 @@ Untuk submission lama yang belum mempunyai lokasi/foto, body dapat mengisi nilai
       "id": "105",
       "status": "approved",
       "reviewedByEmail": "admin@example.test",
-      "reviewNote": "Data kendaraan telah diperiksa."
+      "reviewNote": "Data kendaraan telah diperiksa.",
+      "reviewedAt": "2026-11-24T00:00:00.000Z"
     },
     "car": {
       "id": "42"
@@ -464,7 +487,8 @@ Jika dikirim, `reviewNote` harus berisi 1–3.000 karakter setelah trim.
       "id": "105",
       "status": "rejected",
       "reviewedByEmail": "admin@example.test",
-      "reviewNote": "Dokumen kendaraan belum lengkap."
+      "reviewNote": "Dokumen kendaraan belum lengkap.",
+      "reviewedAt": "2026-11-24T00:00:00.000Z"
     },
     "car": null
   }
@@ -475,7 +499,15 @@ Error yang mungkin: sama dengan endpoint approval, kecuali `SUBMISSION_MISSING_R
 
 ## Endpoint admin: akun admin
 
-Kedua endpoint hanya dapat dipakai oleh owner dengan sesi aktif dan `Origin` tepercaya. Tidak ada endpoint untuk mengambil daftar akun admin.
+Semua endpoint hanya dapat dipakai oleh owner dengan sesi aktif. Operasi tulis juga memerlukan `Origin` tepercaya.
+
+### `GET /api/admin/users`
+
+Mengambil daftar akun owner/admin beserta status aktif dan waktu pembuatan. Hash/password tidak pernah dikembalikan.
+
+**Respons `200`:** `{ "success": true, "data": [<Admin>] }`.
+
+**Respons error:** `401 UNAUTHENTICATED` atau `403 FORBIDDEN` jika sesi bukan owner.
 
 ### `POST /api/admin/users`
 
@@ -533,6 +565,10 @@ Menonaktifkan akun aktif dengan role `admin`; sesi aktif akun tersebut ikut dica
   "mileage": 25000,
   "price": "180000000",
   "imageUrl": "https://images.example.test/car.jpg",
+  "images": [
+    "https://images.example.test/car.jpg",
+    "https://images.example.test/car-side.jpg"
+  ],
   "sellerName": "Ayu",
   "sellerPhone": "+6281234567890",
   "location": "Bandung",
@@ -554,17 +590,21 @@ Menonaktifkan akun aktif dengan role `admin`; sesi aktif akun tersebut ikut dica
   "transmission": "Automatic",
   "mileage": 25000,
   "expectedPrice": "180000000",
-  "imageUrl": "https://images.example.test/car.jpg",
+  "images": [
+    "https://images.example.test/car.jpg",
+    "https://images.example.test/car-side.jpg"
+  ],
   "location": "Bandung",
   "description": "Kondisi terawat",
   "status": "pending",
   "reviewedByEmail": null,
   "reviewNote": null,
+  "reviewedAt": null,
   "createdAt": "2026-01-15T10:30:00.000Z"
 }
 ```
 
-Untuk submission lama, `imageUrl` dan `location` dapat bernilai `null`. `reviewedByEmail` dan `reviewNote` bernilai `null` sampai review dilakukan. Respons `POST /api/submissions` hanya mengembalikan `id`, `status`, dan `createdAt`; respons moderasi hanya mengembalikan ringkasan submission dan ID mobil jika approval berhasil.
+Untuk submission lama, `imageUrl` dan `location` dapat bernilai `null`; `images` dapat kosong. `reviewedByEmail`, `reviewNote`, dan `reviewedAt` bernilai `null` sampai review dilakukan. Data historis yang sudah di-backfill dapat memakai `createdAt` sebagai perkiraan `reviewedAt`. Respons `POST /api/submissions` hanya mengembalikan `id`, `status`, dan `createdAt`; respons moderasi mengembalikan ringkasan submission dan ID mobil jika approval berhasil.
 
 ### Admin
 
