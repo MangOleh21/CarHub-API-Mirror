@@ -26,6 +26,12 @@ export function registerAdminCarsRoutes(app, { carModel, adminModel, allowedOrig
     writeController.update,
   );
   app.delete(
+    '/api/admin/cars/:id/permanent',
+    requireTrustedOrigin,
+    requireAdmin,
+    writeController.permanentlyDelete,
+  );
+  app.delete(
     '/api/admin/cars/:id',
     requireTrustedOrigin,
     requireAdmin,

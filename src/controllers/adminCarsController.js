@@ -131,5 +131,19 @@ export function createAdminCarsController(carModel) {
 
       return response.status(204).end();
     },
+
+    permanentlyDelete: async (request, response) => {
+      const parsedId = carIdSchema.safeParse(request.params.id);
+      if (!parsedId.success) {
+        return validationError(response, parsedId.error, 'Invalid car id');
+      }
+
+      const deletedCar = await carModel.permanentlyDeleteArchivedById(parsedId.data);
+      if (!deletedCar) {
+        return notFound(response);
+      }
+
+      return response.status(204).end();
+    },
   };
 }

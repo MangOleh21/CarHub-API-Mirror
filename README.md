@@ -104,6 +104,7 @@ Admin login memakai cookie sesi HttpOnly; jangan mengirim token lewat LocalStora
 | `POST /api/admin/cars` | Admin terautentikasi + Origin tepercaya | Membuat mobil katalog |
 | `PUT /api/admin/cars/:id` | Admin terautentikasi + Origin tepercaya | Mengganti seluruh data mobil |
 | `DELETE /api/admin/cars/:id` | Admin terautentikasi + Origin tepercaya | Mengarsipkan mobil tanpa menghapus datanya; respons `204` |
+| `DELETE /api/admin/cars/:id/permanent` | Admin terautentikasi + Origin tepercaya | Menghapus permanen mobil yang sudah diarsipkan; foto di object storage tetap tersimpan; respons `204` |
 | `PATCH /api/admin/cars/:id/restore` | Admin terautentikasi + Origin tepercaya | Memulihkan mobil ke katalog aktif; respons `204` |
 | `GET /api/admin/submissions?status=pending&page=1&pageSize=20` | Admin terautentikasi | Daftar submission terpaginasikan; status default `pending`, filter menerima `pending`, `approved`, `rejected`, atau `all` untuk semua status |
 | `PATCH /api/admin/submissions/:id/approved` | Admin terautentikasi + Origin tepercaya | Menyetujui dan membuat mobil katalog secara atomik |
@@ -112,7 +113,7 @@ Admin login memakai cookie sesi HttpOnly; jangan mengirim token lewat LocalStora
 | `POST /api/admin/users` | Owner | Membuat akun ber-role `admin`; body berisi `email` dan `password` |
 | `PATCH /api/admin/users/:id/deactivate` | Owner | Menonaktifkan akun admin aktif |
 
-Password admin harus 12–128 karakter. Body `POST` dan `PUT` mobil menerima `brand`, `model`, `year`, `transmission`, `fuelType`, `mileage`, `price`, `images` (1–10 URL HTTPS; atau `imageUrl` lama untuk satu foto), `sellerName`, `sellerPhone`, `location`, dan `description`. `fuelType` default ke `Bensin`, `description` boleh `null` atau tidak dikirim. Karena `PUT` mengganti seluruh data, field yang tidak dikirim akan memakai default atau dikosongkan sesuai aturan tersebut. `DELETE` mengarsipkan baris mobil; gunakan `PATCH /api/admin/cars/:id/restore` untuk memulihkannya.
+Password admin harus 12–128 karakter. Body `POST` dan `PUT` mobil menerima `brand`, `model`, `year`, `transmission`, `fuelType`, `mileage`, `price`, `images` (1–10 URL HTTPS; atau `imageUrl` lama untuk satu foto), `sellerName`, `sellerPhone`, `location`, dan `description`. `fuelType` default ke `Bensin`, `description` boleh `null` atau tidak dikirim. Karena `PUT` mengganti seluruh data, field yang tidak dikirim akan memakai default atau dikosongkan sesuai aturan tersebut. `DELETE /api/admin/cars/:id` mengarsipkan baris mobil; gunakan `PATCH /api/admin/cars/:id/restore` untuk memulihkannya. `DELETE /api/admin/cars/:id/permanent` menghapus permanen hanya baris yang sudah diarsipkan; file foto di object storage tidak dihapus.
 
 Body kedua endpoint menerima `reviewNote` opsional (maksimal 3.000 karakter). Untuk approval, `location` dan/atau `images` juga dapat dikirim jika submission lama belum memilikinya; data yang sudah diberikan penjual tetap dipakai. Email reviewer diambil dari sesi admin dan tidak dapat ditentukan melalui body. Submission yang sudah tidak berstatus `pending` tidak dapat diproses kembali (`409`). Keputusan baru menyimpan email reviewer, catatan, dan `reviewedAt`; nilai historis pada database development dapat memakai `created_at` sebagai perkiraan.
 

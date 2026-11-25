@@ -204,5 +204,15 @@ export function createCarsModel(pool) {
       );
       return result.rows[0] ?? null;
     },
+
+    async permanentlyDeleteArchivedById(id) {
+      const result = await pool.query(
+        `DELETE FROM cars
+         WHERE id = $1 AND archived_at IS NOT NULL
+         RETURNING id::text AS id`,
+        [id],
+      );
+      return result.rows[0] ?? null;
+    },
   };
 }

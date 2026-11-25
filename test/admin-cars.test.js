@@ -228,6 +228,73 @@ test('admin can replace, archive, and restore a car', async () => {
   }
 });
 
+test('admin can permanently delete a car from the archive', async () => {
+  let deletedId;
+  const client = await createClient({
+    async permanentlyDeleteArchivedById(id) {
+      deletedId = id;
+      return { id };
+    },
+  });
+
+  try {
+    const response = await client.request('/api/admin/cars/12/permanent', {
+      method: 'DELETE',
+      cookie: sessionCookie,
+      origin,
+    });
+
+    assert.equal(response.status, 204);
+    assert.equal(response.body, null);
+    assert.equal(deletedId, '12');
+  } finally {
+    await client.close();
+  }
+});
+
+test('permanent car deletion requires trusted admin origin and an archived record', async () => {
+  let deleteCalls = 0;
+  const client = await createClient({
+    async permanentlyDeleteArchivedById() {
+      deleteCalls += 1;
+      return null;
+    },
+  });
+
+  try {
+    const unauthenticated = await client.request('/api/admin/cars/12/permanent', {
+      method: 'DELETE',
+      origin,
+    });
+    assert.equal(unauthenticated.status, 401);
+
+    const untrustedOrigin = await client.request('/api/admin/cars/12/permanent', {
+      method: 'DELETE',
+      cookie: sessionCookie,
+      origin: 'https://attacker.example',
+    });
+    assert.equal(untrustedOrigin.status, 403);
+
+    const invalidId = await client.request('/api/admin/cars/0/permanent', {
+      method: 'DELETE',
+      cookie: sessionCookie,
+      origin,
+    });
+    assert.equal(invalidId.status, 422);
+
+    const activeOrMissing = await client.request('/api/admin/cars/12/permanent', {
+      method: 'DELETE',
+      cookie: sessionCookie,
+      origin,
+    });
+    assert.equal(activeOrMissing.status, 404);
+    assert.equal(activeOrMissing.body.error.code, 'NOT_FOUND');
+    assert.equal(deleteCalls, 1);
+  } finally {
+    await client.close();
+  }
+});
+
 test('admin car writes reject untrusted origins, invalid payloads, and missing records', async () => {
   let writeCalls = 0;
   const client = await createClient({

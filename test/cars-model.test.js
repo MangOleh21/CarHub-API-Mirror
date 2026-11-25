@@ -151,6 +151,30 @@ test('archive listing includes only archived cars', async () => {
   assert.match(calls[1], /archived_at IS NOT NULL/);
 });
 
+test('permanent deletion only targets archived cars and uses a parameterized id', async () => {
+  let query;
+  const model = createCarsModel({
+    async query(sql, values) {
+      query = { sql, values };
+      return { rows: [{ id: '12' }] };
+    },
+  });
+
+  assert.deepEqual(await model.permanentlyDeleteArchivedById('12'), { id: '12' });
+  assert.match(query.sql, /DELETE FROM cars\s+WHERE id = \$1 AND archived_at IS NOT NULL\s+RETURNING id::text AS id/);
+  assert.deepEqual(query.values, ['12']);
+});
+
+test('permanent deletion returns null when no archived car matches', async () => {
+  const model = createCarsModel({
+    async query() {
+      return { rows: [] };
+    },
+  });
+
+  assert.equal(await model.permanentlyDeleteArchivedById('12'), null);
+});
+
 test('car model lists distinct catalog brands in case-insensitive alphabetical order', async () => {
   let queryText;
   const model = createCarsModel({

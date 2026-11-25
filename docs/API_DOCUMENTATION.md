@@ -374,6 +374,14 @@ Mengarsipkan satu mobil. Data tetap tersimpan dan hilang dari katalog publik ser
 
 **Respons error:** `401 UNAUTHENTICATED`, `403 FORBIDDEN`, `422 VALIDATION_ERROR` untuk ID tidak valid, atau `404 NOT_FOUND` jika mobil tidak ditemukan.
 
+### `DELETE /api/admin/cars/:id/permanent`
+
+Menghapus permanen satu mobil yang sudah diarsipkan. Endpoint ini memerlukan admin terautentikasi dan `Origin` tepercaya. Baris katalog dihapus dari database; file foto di Cloudinary/object storage tidak ikut dihapus.
+
+**Respons `204`:** tidak ada response body.
+
+**Respons error:** `401 UNAUTHENTICATED`, `403 FORBIDDEN`, `422 VALIDATION_ERROR` untuk ID tidak valid, atau `404 NOT_FOUND` jika mobil tidak ditemukan atau belum diarsipkan.
+
 ### `PATCH /api/admin/cars/:id/restore`
 
 Memulihkan mobil dari arsip ke katalog aktif. Aksi ini hanya tersedia untuk admin terautentikasi dan wajib mengirim `Origin` tepercaya.
