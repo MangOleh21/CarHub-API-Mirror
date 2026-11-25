@@ -6,7 +6,7 @@ import {
 } from '../middleware/admin-auth.js';
 
 export function registerAdminCarsRoutes(app, { carModel, adminModel, allowedOrigins }) {
-  const readController = createCarController(carModel);
+  const readController = createCarController(carModel, { allowArchived: true });
   const writeController = createAdminCarsController(carModel);
   const requireAdmin = createRequireAdmin(adminModel);
   const requireTrustedOrigin = createRequireTrustedOrigin(allowedOrigins);
@@ -29,6 +29,12 @@ export function registerAdminCarsRoutes(app, { carModel, adminModel, allowedOrig
     '/api/admin/cars/:id',
     requireTrustedOrigin,
     requireAdmin,
-    writeController.delete,
+    writeController.archive,
+  );
+  app.patch(
+    '/api/admin/cars/:id/restore',
+    requireTrustedOrigin,
+    requireAdmin,
+    writeController.restore,
   );
 }

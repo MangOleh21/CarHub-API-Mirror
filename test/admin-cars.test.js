@@ -75,12 +75,14 @@ async function createClient(carModel) {
 
 test('admin can list and read cars but public access does not bypass admin authentication', async () => {
   let receivedFilters;
+  let lookupOptions;
   const client = await createClient({
     async list(filters) {
       receivedFilters = filters;
       return { items: [car], totalItems: 1 };
     },
-    async getById(id) {
+    async getById(id, options) {
+      lookupOptions = options;
       return id === car.id ? car : null;
     },
   });
@@ -94,6 +96,7 @@ test('admin can list and read cars but public access does not bypass admin authe
     });
     assert.equal(list.status, 200);
     assert.deepEqual(receivedFilters, {
+      archiveStatus: 'active',
       sortBy: 'createdAt',
       sortOrder: 'desc',
       limit: 5,
@@ -101,11 +104,17 @@ test('admin can list and read cars but public access does not bypass admin authe
     });
     assert.deepEqual(list.body.data, [car]);
 
+    await client.request('/api/admin/cars?archiveStatus=archived', {
+      cookie: sessionCookie,
+    });
+    assert.equal(receivedFilters.archiveStatus, 'archived');
+
     const detail = await client.request('/api/admin/cars/12', {
       cookie: sessionCookie,
     });
     assert.equal(detail.status, 200);
     assert.deepEqual(detail.body.data, car);
+    assert.deepEqual(lookupOptions, { includeArchived: true });
   } finally {
     await client.close();
   }
@@ -167,16 +176,21 @@ test('admin can save a gallery while retaining the first-image compatibility fie
   }
 });
 
-test('admin can replace a car and hard-delete it', async () => {
+test('admin can replace, archive, and restore a car', async () => {
   let updatedInput;
-  let deletedId;
+  let archivedId;
+  let restoredId;
   const client = await createClient({
     async update(id, input) {
       updatedInput = { id, ...input };
       return { ...car, model: input.model };
     },
-    async deleteById(id) {
-      deletedId = id;
+    async archiveById(id) {
+      archivedId = id;
+      return { id };
+    },
+    async restoreById(id) {
+      restoredId = id;
       return { id };
     },
   });
@@ -192,14 +206,23 @@ test('admin can replace a car and hard-delete it', async () => {
     assert.equal(updatedInput.id, '12');
     assert.equal(update.body.data.model, 'Avanza Veloz');
 
-    const deletion = await client.request('/api/admin/cars/12', {
+    const archive = await client.request('/api/admin/cars/12', {
       method: 'DELETE',
       cookie: sessionCookie,
       origin,
     });
-    assert.equal(deletion.status, 204);
-    assert.equal(deletion.body, null);
-    assert.equal(deletedId, '12');
+    assert.equal(archive.status, 204);
+    assert.equal(archive.body, null);
+    assert.equal(archivedId, '12');
+
+    const restore = await client.request('/api/admin/cars/12/restore', {
+      method: 'PATCH',
+      cookie: sessionCookie,
+      origin,
+    });
+    assert.equal(restore.status, 204);
+    assert.equal(restore.body, null);
+    assert.equal(restoredId, '12');
   } finally {
     await client.close();
   }
@@ -216,7 +239,11 @@ test('admin car writes reject untrusted origins, invalid payloads, and missing r
       writeCalls += 1;
       return null;
     },
-    async deleteById() {
+    async archiveById() {
+      writeCalls += 1;
+      return null;
+    },
+    async restoreById() {
       writeCalls += 1;
       return null;
     },
@@ -248,12 +275,38 @@ test('admin car writes reject untrusted origins, invalid payloads, and missing r
     });
     assert.equal(updateMissing.status, 404);
 
-    const deleteMissing = await client.request('/api/admin/cars/99', {
+    const archiveMissing = await client.request('/api/admin/cars/99', {
       method: 'DELETE',
       cookie: sessionCookie,
       origin,
     });
-    assert.equal(deleteMissing.status, 404);
+    assert.equal(archiveMissing.status, 404);
+
+    const restoreMissing = await client.request('/api/admin/cars/99/restore', {
+      method: 'PATCH',
+      cookie: sessionCookie,
+      origin,
+    });
+    assert.equal(restoreMissing.status, 404);
+  } finally {
+    await client.close();
+  }
+});
+
+test('admin car listing rejects unsupported archive states', async () => {
+  const client = await createClient({
+    async list() {
+      assert.fail('Invalid archive status must not reach the repository');
+    },
+  });
+
+  try {
+    const response = await client.request('/api/admin/cars?archiveStatus=all', {
+      cookie: sessionCookie,
+    });
+
+    assert.equal(response.status, 422);
+    assert.equal(response.body.error.code, 'VALIDATION_ERROR');
   } finally {
     await client.close();
   }

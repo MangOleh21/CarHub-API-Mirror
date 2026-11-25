@@ -3,7 +3,7 @@ import { z } from 'zod';
 const optionalFilter = z.string().trim().max(100).optional()
   .transform((value) => value || undefined);
 
-const listQuerySchema = z.object({
+const listQueryFields = {
   search: optionalFilter,
   brand: optionalFilter,
   transmission: z.enum(['Manual', 'Automatic', 'CVT', 'DCT', 'AMT']).optional(),
@@ -15,13 +15,25 @@ const listQuerySchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   page: z.coerce.number().int().min(1).max(1_000_000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
-}).strict().refine(
-  ({ minPrice, maxPrice }) => minPrice === undefined || maxPrice === undefined || minPrice <= maxPrice,
-  { path: ['maxPrice'], message: 'Maximum price must not be less than minimum price' },
-).refine(
-  ({ minYear, maxYear }) => minYear === undefined || maxYear === undefined || minYear <= maxYear,
-  { path: ['maxYear'], message: 'Maximum year must not be less than minimum year' },
-);
+};
+
+function createListQuerySchema(allowArchiveStatus) {
+  return z.object({
+    ...listQueryFields,
+    ...(allowArchiveStatus
+      ? { archiveStatus: z.enum(['active', 'archived']).default('active') }
+      : {}),
+  }).strict().refine(
+    ({ minPrice, maxPrice }) => minPrice === undefined || maxPrice === undefined || minPrice <= maxPrice,
+    { path: ['maxPrice'], message: 'Maximum price must not be less than minimum price' },
+  ).refine(
+    ({ minYear, maxYear }) => minYear === undefined || maxYear === undefined || minYear <= maxYear,
+    { path: ['maxYear'], message: 'Maximum year must not be less than minimum year' },
+  );
+}
+
+const listQuerySchema = createListQuerySchema(false);
+const adminListQuerySchema = createListQuerySchema(true);
 
 const maxBigintId = 9_223_372_036_854_775_807n;
 const carIdSchema = z.string()
@@ -38,7 +50,7 @@ function validationError(response, error, message) {
   });
 }
 
-export function createCarController(carModel) {
+export function createCarController(carModel, { allowArchived = false } = {}) {
   return {
     listBrands: async (_request, response) => {
       const brands = await carModel.listBrands();
@@ -46,14 +58,16 @@ export function createCarController(carModel) {
     },
 
     list: async (request, response) => {
-      const parsedQuery = listQuerySchema.safeParse(request.query);
+      const parsedQuery = (allowArchived ? adminListQuerySchema : listQuerySchema)
+        .safeParse(request.query);
       if (!parsedQuery.success) {
         return validationError(response, parsedQuery.error, 'Invalid car query');
       }
 
-      const { page, pageSize, ...filters } = parsedQuery.data;
+      const { page, pageSize, archiveStatus, ...filters } = parsedQuery.data;
       const result = await carModel.list({
         ...filters,
+        ...(allowArchived ? { archiveStatus } : {}),
         limit: pageSize,
         offset: (page - 1) * pageSize,
       });
@@ -76,7 +90,7 @@ export function createCarController(carModel) {
         return validationError(response, parsedId.error, 'Invalid car id');
       }
 
-      const car = await carModel.getById(parsedId.data);
+      const car = await carModel.getById(parsedId.data, { includeArchived: allowArchived });
       if (!car) {
         return response.status(404).json({
           error: {

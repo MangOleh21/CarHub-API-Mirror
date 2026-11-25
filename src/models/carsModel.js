@@ -24,7 +24,7 @@ export function createCarsModel(pool) {
     async listBrands() {
       const result = await pool.query(
         `SELECT brand
-         FROM (SELECT DISTINCT brand FROM cars) AS catalog_brands
+         FROM (SELECT DISTINCT brand FROM cars WHERE archived_at IS NULL) AS catalog_brands
          ORDER BY LOWER(brand), brand`,
       );
       return result.rows.map(({ brand }) => brand);
@@ -40,10 +40,13 @@ export function createCarsModel(pool) {
       maxYear,
       sortBy = 'createdAt',
       sortOrder = 'desc',
+      archiveStatus = 'active',
       limit,
       offset,
     }) {
-      const filters = [];
+      const filters = [archiveStatus === 'archived'
+        ? 'archived_at IS NOT NULL'
+        : 'archived_at IS NULL'];
       const values = [];
 
       if (search) {
@@ -95,9 +98,10 @@ export function createCarsModel(pool) {
       return { items: result.rows, totalItems };
     },
 
-    async getById(id) {
+    async getById(id, { includeArchived = false } = {}) {
+      const archiveFilter = includeArchived ? '' : ' AND archived_at IS NULL';
       const result = await pool.query(
-        `SELECT ${carColumns} FROM cars WHERE id = $1`,
+        `SELECT ${carColumns} FROM cars WHERE id = $1${archiveFilter}`,
         [id],
       );
       return result.rows[0] ?? null;
@@ -179,9 +183,23 @@ export function createCarsModel(pool) {
       return result.rows[0] ?? null;
     },
 
-    async deleteById(id) {
+    async archiveById(id) {
       const result = await pool.query(
-        'DELETE FROM cars WHERE id = $1 RETURNING id::text AS id',
+        `UPDATE cars
+         SET archived_at = COALESCE(archived_at, NOW())
+         WHERE id = $1
+         RETURNING id::text AS id`,
+        [id],
+      );
+      return result.rows[0] ?? null;
+    },
+
+    async restoreById(id) {
+      const result = await pool.query(
+        `UPDATE cars
+         SET archived_at = NULL
+         WHERE id = $1
+         RETURNING id::text AS id`,
         [id],
       );
       return result.rows[0] ?? null;

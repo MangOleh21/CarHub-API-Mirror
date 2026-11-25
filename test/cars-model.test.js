@@ -24,12 +24,12 @@ const car = {
   price: '180000000',
 };
 
-test('car model creates, replaces, and permanently deletes catalog rows', async () => {
+test('car model creates, replaces, archives, and restores catalog rows', async () => {
   const calls = [];
   const pool = {
     async query(sql, values) {
       calls.push({ sql, values });
-      if (sql.startsWith('DELETE FROM cars')) {
+      if (sql.includes('SET archived_at')) {
         return { rows: [{ id: '12' }] };
       }
       return { rows: [car] };
@@ -39,7 +39,8 @@ test('car model creates, replaces, and permanently deletes catalog rows', async 
 
   assert.deepEqual(await model.create(input), car);
   assert.deepEqual(await model.update('12', input), car);
-  assert.deepEqual(await model.deleteById('12'), { id: '12' });
+  assert.deepEqual(await model.archiveById('12'), { id: '12' });
+  assert.deepEqual(await model.restoreById('12'), { id: '12' });
 
   assert.match(calls[0].sql, /INSERT INTO cars/);
   assert.match(calls[1].sql, /UPDATE cars/);
@@ -59,8 +60,10 @@ test('car model creates, replaces, and permanently deletes catalog rows', async 
     input.description,
   ]);
   assert.deepEqual(calls[1].values, [...calls[0].values, '12']);
-  assert.match(calls[2].sql, /DELETE FROM cars WHERE id = \$1/);
+  assert.match(calls[2].sql, /UPDATE cars\s+SET archived_at = COALESCE\(archived_at, NOW\(\)\)\s+WHERE id = \$1/);
+  assert.match(calls[3].sql, /UPDATE cars\s+SET archived_at = NULL\s+WHERE id = \$1/);
   assert.deepEqual(calls[2].values, ['12']);
+  assert.deepEqual(calls[3].values, ['12']);
 });
 
 test('car model filters and sorts catalog records with parameterized values', async () => {
@@ -108,6 +111,46 @@ test('car model filters and sorts catalog records with parameterized values', as
   ]);
 });
 
+test('active catalog lookups and brands exclude archived cars', async () => {
+  const calls = [];
+  const model = createCarsModel({
+    async query(sql) {
+      calls.push(sql);
+      return sql.includes('COUNT(*)')
+        ? { rows: [{ count: '1' }] }
+        : sql.includes('SELECT brand')
+          ? { rows: [{ brand: 'Toyota' }] }
+          : { rows: [car] };
+    },
+  });
+
+  await model.list({ limit: 20, offset: 0 });
+  await model.getById('12');
+  await model.listBrands();
+
+  assert.match(calls[0], /archived_at IS NULL/);
+  assert.match(calls[1], /archived_at IS NULL/);
+  assert.match(calls[2], /archived_at IS NULL/);
+  assert.match(calls[3], /archived_at IS NULL/);
+});
+
+test('archive listing includes only archived cars', async () => {
+  const calls = [];
+  const model = createCarsModel({
+    async query(sql) {
+      calls.push(sql);
+      return sql.includes('COUNT(*)')
+        ? { rows: [{ count: '1' }] }
+        : { rows: [car] };
+    },
+  });
+
+  await model.list({ archiveStatus: 'archived', limit: 20, offset: 0 });
+
+  assert.match(calls[0], /archived_at IS NOT NULL/);
+  assert.match(calls[1], /archived_at IS NOT NULL/);
+});
+
 test('car model lists distinct catalog brands in case-insensitive alphabetical order', async () => {
   let queryText;
   const model = createCarsModel({
@@ -120,6 +163,6 @@ test('car model lists distinct catalog brands in case-insensitive alphabetical o
   assert.deepEqual(await model.listBrands(), ['Honda', 'Toyota']);
   assert.match(
     queryText.replace(/\s+/g, ' '),
-    /SELECT brand FROM \(SELECT DISTINCT brand FROM cars\) AS catalog_brands ORDER BY LOWER\(brand\), brand/,
+    /SELECT brand FROM \(SELECT DISTINCT brand FROM cars WHERE archived_at IS NULL\) AS catalog_brands ORDER BY LOWER\(brand\), brand/,
   );
 });

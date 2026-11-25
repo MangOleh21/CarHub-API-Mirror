@@ -43,8 +43,9 @@ test('migration runner applies each numbered migration once in order', async () 
     '003_add_submission_review_details',
     '004_add_car_images_and_reviewed_at',
     '005_add_submission_fuel_type_and_transmission_options',
+    '006_add_car_archive',
   ]);
-  assert.equal(firstRunSqlCount, 5);
+  assert.equal(firstRunSqlCount, 6);
   assert.equal(appliedSql.length, firstRunSqlCount);
   assert.match(appliedSql[1], /ALTER TABLE submissions ADD COLUMN location/);
   assert.match(appliedSql[2], /ADD COLUMN reviewed_by_email/);
@@ -54,4 +55,5 @@ test('migration runner applies each numbered migration once in order', async () 
   assert.match(appliedSql[4], /CHECK \(transmission IN \('Manual', 'Automatic', 'CVT', 'DCT', 'AMT'\)\)/);
   assert.match(appliedSql[4], /ADD COLUMN IF NOT EXISTS fuel_type VARCHAR\(50\)/);
   assert.doesNotMatch(appliedSql[4], /\bUPDATE\b/);
+  assert.match(appliedSql[5], /ALTER TABLE cars\s+ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ/);
 });

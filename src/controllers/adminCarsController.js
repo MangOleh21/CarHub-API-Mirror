@@ -104,14 +104,28 @@ export function createAdminCarsController(carModel) {
       return response.status(200).json({ success: true, data: car });
     },
 
-    delete: async (request, response) => {
+    archive: async (request, response) => {
       const parsedId = carIdSchema.safeParse(request.params.id);
       if (!parsedId.success) {
         return validationError(response, parsedId.error, 'Invalid car id');
       }
 
-      const deletedCar = await carModel.deleteById(parsedId.data);
-      if (!deletedCar) {
+      const archivedCar = await carModel.archiveById(parsedId.data);
+      if (!archivedCar) {
+        return notFound(response);
+      }
+
+      return response.status(204).end();
+    },
+
+    restore: async (request, response) => {
+      const parsedId = carIdSchema.safeParse(request.params.id);
+      if (!parsedId.success) {
+        return validationError(response, parsedId.error, 'Invalid car id');
+      }
+
+      const restoredCar = await carModel.restoreById(parsedId.data);
+      if (!restoredCar) {
         return notFound(response);
       }
 

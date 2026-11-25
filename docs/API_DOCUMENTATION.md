@@ -27,7 +27,7 @@ Untuk deployment, ganti dengan URL API yang dikonfigurasi. Jangan pernah mengiri
 
 ### Pagination dan filter katalog
 
-`GET /api/cars` dan `GET /api/admin/cars` menerima query berikut:
+`GET /api/cars` menerima query filter katalog berikut. `GET /api/admin/cars` menerima query yang sama dan tambahan `archiveStatus`.
 
 | Parameter | Tipe | Default | Aturan |
 |---|---|---:|---|
@@ -40,6 +40,7 @@ Untuk deployment, ganti dengan URL API yang dikonfigurasi. Jangan pernah mengiri
 | `sortOrder` | string | `desc` | `asc` atau `desc` |
 | `page` | integer | `1` | Rentang 1–1.000.000 |
 | `pageSize` | integer | `20` | Rentang 1–100 |
+| `archiveStatus` (admin only) | string | `active` | `active` atau `archived`; tidak tersedia pada endpoint publik |
 
 Filter `search`, `brand`, transmisi, dan rentang harga/tahun yang digunakan bersamaan harus cocok semuanya. Parameter sort memakai kolom yang diizinkan server; jika nilai harga/tahun sama, ID menjadi pemecah urutan. Parameter yang tidak dikenal atau nilai di luar aturan menghasilkan `422`. Respons daftar menggunakan bentuk:
 
@@ -311,7 +312,7 @@ Semua endpoint katalog admin selain pembacaan memerlukan sesi admin aktif dan `O
 
 ### `GET /api/admin/cars`
 
-Mengambil daftar mobil untuk pengelolaan. Mendukung filter dan pagination yang sama dengan `GET /api/cars`.
+Mengambil daftar mobil untuk pengelolaan. Mendukung filter dan pagination yang sama dengan `GET /api/cars`, serta `archiveStatus=active` (default) atau `archiveStatus=archived`. Listing arsip tetap dapat dilihat admin, tetapi tidak muncul pada endpoint publik.
 
 **Respons `200`:** mengikuti bentuk respons daftar umum; setiap item menggunakan skema [Car](#car).
 
@@ -319,7 +320,7 @@ Mengambil daftar mobil untuk pengelolaan. Mendukung filter dan pagination yang s
 
 ### `GET /api/admin/cars/:id`
 
-Mengambil detail mobil untuk admin. Respons sukses dan error sama seperti `GET /api/cars/:id`, ditambah `401 UNAUTHENTICATED` jika belum login.
+Mengambil detail mobil untuk admin, termasuk mobil yang diarsipkan. Respons sukses dan error sama seperti `GET /api/cars/:id`, ditambah `401 UNAUTHENTICATED` jika belum login.
 
 ### `POST /api/admin/cars`
 
@@ -367,7 +368,15 @@ Mengganti data mobil. `PUT` memerlukan body lengkap, bukan partial update.
 
 ### `DELETE /api/admin/cars/:id`
 
-Menghapus permanen satu mobil. Operasi ini adalah **hard delete** dan tidak menyediakan pemulihan melalui API.
+Mengarsipkan satu mobil. Data tetap tersimpan dan hilang dari katalog publik serta daftar admin aktif. Listing yang sudah diarsipkan tidak terhapus permanen; operasi ini idempoten.
+
+**Respons `204`:** tidak ada response body.
+
+**Respons error:** `401 UNAUTHENTICATED`, `403 FORBIDDEN`, `422 VALIDATION_ERROR` untuk ID tidak valid, atau `404 NOT_FOUND` jika mobil tidak ditemukan.
+
+### `PATCH /api/admin/cars/:id/restore`
+
+Memulihkan mobil dari arsip ke katalog aktif. Aksi ini hanya tersedia untuk admin terautentikasi dan wajib mengirim `Origin` tepercaya.
 
 **Respons `204`:** tidak ada response body.
 
