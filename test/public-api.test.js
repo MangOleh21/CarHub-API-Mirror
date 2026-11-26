@@ -21,6 +21,9 @@ const car = {
   createdAt: '2026-11-17T00:00:00.000Z',
 };
 
+const origin = 'http://localhost:5173';
+const userSessionCookie = 'carhub_user_session=test-user-token';
+
 function createTestApp(options = {}) {
   return createApp({
     carModel: {
@@ -38,6 +41,24 @@ function createTestApp(options = {}) {
       async getActiveSession() { return null; },
       async revokeSession() {},
     },
+    userModel: {
+      async findByEmail() { return null; },
+      async create() { return null; },
+      async updateProfile() { return null; },
+      async listListingsByUser() { return { items: [], totalItems: 0 }; },
+      async createSession() {},
+      async getActiveSession() {
+        return {
+          id: '15',
+          name: 'Ayu',
+          email: 'ayu@example.test',
+          phone: '628123456789',
+          location: 'Jakarta',
+        };
+      },
+      async revokeSession() {},
+    },
+    allowedOrigins: [origin],
     ...options,
   });
 }
@@ -51,7 +72,11 @@ async function request(app, path, options = {}) {
   try {
     const response = await fetch(`http://127.0.0.1:${address.port}${path}`, {
       method: options.method ?? 'GET',
-      headers: options.body ? { 'content-type': 'application/json' } : undefined,
+      headers: {
+        ...(options.body ? { 'content-type': 'application/json' } : {}),
+        ...(options.origin ? { origin: options.origin } : {}),
+        ...(options.cookie ? { cookie: options.cookie } : {}),
+      },
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
 
@@ -131,11 +156,14 @@ test('car list accepts range filters and sorting and rejects inverted ranges', a
 
   const response = await request(
     app,
-    '/api/cars?minPrice=100000000&maxPrice=200000000&minYear=2018&maxYear=2022&transmission=CVT&sortBy=price&sortOrder=asc',
+    '/api/cars?minPrice=100000000&maxPrice=200000000&minYear=2018&maxYear=2022&transmission=CVT&fuelType=Hybrid&color=Putih&bodyType=SUV&bodyType=MPV&sortBy=price&sortOrder=asc',
   );
   assert.equal(response.status, 200);
   assert.deepEqual(receivedFilters, {
     transmission: 'CVT',
+    fuelType: 'Hybrid',
+    color: 'Putih',
+    bodyType: ['SUV', 'MPV'],
     minPrice: 100_000_000,
     maxPrice: 200_000_000,
     minYear: 2018,
@@ -149,6 +177,10 @@ test('car list accepts range filters and sorting and rejects inverted ranges', a
   const invalidRange = await request(app, '/api/cars?minPrice=200&maxPrice=100');
   assert.equal(invalidRange.status, 422);
   assert.equal(invalidRange.body.error.code, 'VALIDATION_ERROR');
+
+  const invalidBodyType = await request(app, '/api/cars?bodyType=Coupe');
+  assert.equal(invalidBodyType.status, 422);
+  assert.equal(invalidBodyType.body.error.code, 'VALIDATION_ERROR');
 });
 
 test('car detail returns 404 when the repository has no matching car', async () => {
@@ -201,6 +233,8 @@ test('submission endpoint validates input and returns the pending submission', a
 
   const response = await request(app, '/api/submissions', {
     method: 'POST',
+    origin,
+    cookie: userSessionCookie,
     body: {
       sellerName: 'Ayu',
       sellerPhone: '628123456789',
@@ -209,6 +243,8 @@ test('submission endpoint validates input and returns the pending submission', a
       year: 2020,
       transmission: 'CVT',
       fuelType: 'Listrik',
+      color: 'Putih',
+      bodyType: 'MPV',
       mileage: 25_000,
       expectedPrice: 180_000_000,
       location: 'Jakarta',
@@ -221,9 +257,12 @@ test('submission endpoint validates input and returns the pending submission', a
   });
 
   assert.equal(response.status, 201);
+  assert.equal(receivedInput.userId, '15');
   assert.equal(receivedInput.sellerName, 'Ayu');
   assert.equal(receivedInput.transmission, 'CVT');
   assert.equal(receivedInput.fuelType, 'Listrik');
+  assert.equal(receivedInput.color, 'Putih');
+  assert.equal(receivedInput.bodyType, 'MPV');
   assert.equal(receivedInput.location, 'Jakarta');
   assert.equal(receivedInput.imageUrl, 'https://images.example/car.jpg');
   assert.deepEqual(receivedInput.images, [
@@ -233,7 +272,32 @@ test('submission endpoint validates input and returns the pending submission', a
   assert.equal(response.body.data.status, 'pending');
 });
 
-test('submission endpoint defaults fuel type for clients that omit the new field', async () => {
+test('submission endpoint requires user authentication and trusted origin', async () => {
+  const app = createTestApp({
+    submissionModel: {
+      async create() {
+        assert.fail('Unauthenticated submission must not reach the repository');
+      },
+    },
+  });
+
+  const unauthenticated = await request(app, '/api/submissions', {
+    method: 'POST',
+    origin,
+    body: { brand: 'Toyota' },
+  });
+  assert.equal(unauthenticated.status, 401);
+
+  const untrustedOrigin = await request(app, '/api/submissions', {
+    method: 'POST',
+    origin: 'https://attacker.example',
+    cookie: userSessionCookie,
+    body: { brand: 'Toyota' },
+  });
+  assert.equal(untrustedOrigin.status, 403);
+});
+
+test('submission endpoint defaults fuel type and seller contact from user profile when omitted', async () => {
   let receivedInput;
   const app = createTestApp({
     submissionModel: {
@@ -246,13 +310,15 @@ test('submission endpoint defaults fuel type for clients that omit the new field
 
   const response = await request(app, '/api/submissions', {
     method: 'POST',
+    origin,
+    cookie: userSessionCookie,
     body: {
-      sellerName: 'Ayu',
-      sellerPhone: '628123456789',
       brand: 'Toyota',
       model: 'Avanza',
       year: 2020,
       transmission: 'Manual',
+      color: 'Hitam',
+      bodyType: 'SUV',
       mileage: 25_000,
       expectedPrice: 180_000_000,
       location: 'Jakarta',
@@ -261,7 +327,12 @@ test('submission endpoint defaults fuel type for clients that omit the new field
   });
 
   assert.equal(response.status, 201);
+  assert.equal(receivedInput.userId, '15');
+  assert.equal(receivedInput.sellerName, 'Ayu');
+  assert.equal(receivedInput.sellerPhone, '628123456789');
   assert.equal(receivedInput.fuelType, 'Bensin');
+  assert.equal(receivedInput.color, 'Hitam');
+  assert.equal(receivedInput.bodyType, 'SUV');
 });
 
 test('submission endpoint rejects non-HTTPS image URLs and non-positive prices', async () => {
@@ -275,6 +346,8 @@ test('submission endpoint rejects non-HTTPS image URLs and non-positive prices',
 
   const response = await request(app, '/api/submissions', {
     method: 'POST',
+    origin,
+    cookie: userSessionCookie,
     body: {
       sellerName: 'Ayu',
       sellerPhone: '628123456789',
@@ -282,6 +355,8 @@ test('submission endpoint rejects non-HTTPS image URLs and non-positive prices',
       model: 'Avanza',
       year: 2020,
       transmission: 'Automatic',
+      color: 'Putih',
+      bodyType: 'MPV',
       mileage: 25_000,
       expectedPrice: 0,
       location: 'Jakarta',
@@ -308,6 +383,8 @@ test('submission endpoint requires seller location and an HTTPS image URL', asyn
     model: 'Avanza',
     year: 2020,
     transmission: 'Automatic',
+    color: 'Putih',
+    bodyType: 'MPV',
     mileage: 25_000,
     expectedPrice: 180_000_000,
     imageUrl: 'https://images.example/car.jpg',
@@ -315,15 +392,26 @@ test('submission endpoint requires seller location and an HTTPS image URL', asyn
 
   const missingLocation = await request(app, '/api/submissions', {
     method: 'POST',
+    origin,
+    cookie: userSessionCookie,
     body: baseSubmission,
   });
   const missingImage = await request(app, '/api/submissions', {
     method: 'POST',
+    origin,
+    cookie: userSessionCookie,
     body: { ...baseSubmission, location: 'Jakarta', imageUrl: undefined },
+  });
+  const missingBodyType = await request(app, '/api/submissions', {
+    method: 'POST',
+    origin,
+    cookie: userSessionCookie,
+    body: { ...baseSubmission, location: 'Jakarta', bodyType: undefined },
   });
 
   assert.equal(missingLocation.status, 422);
   assert.equal(missingImage.status, 422);
+  assert.equal(missingBodyType.status, 422);
 });
 
 test('submission endpoint rejects a Vercel Blob URL whose contents are not an image', async () => {
@@ -349,6 +437,8 @@ test('submission endpoint rejects a Vercel Blob URL whose contents are not an im
   try {
     const response = await request(app, '/api/submissions', {
       method: 'POST',
+      origin,
+      cookie: userSessionCookie,
       body: {
         sellerName: 'Ayu',
         sellerPhone: '628123456789',
@@ -356,6 +446,8 @@ test('submission endpoint rejects a Vercel Blob URL whose contents are not an im
         model: 'Avanza',
         year: 2020,
         transmission: 'Automatic',
+        color: 'Putih',
+        bodyType: 'MPV',
         mileage: 25_000,
         expectedPrice: 180_000_000,
         location: 'Jakarta',

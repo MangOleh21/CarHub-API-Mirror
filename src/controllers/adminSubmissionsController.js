@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BODY_TYPE_OPTIONS, COLOR_OPTIONS } from '../constants/car-options.js';
 
 const listQuerySchema = z.object({
   status: z.enum(['pending', 'approved', 'rejected', 'all']).default('pending'),
@@ -18,6 +19,8 @@ const approvalSchema = z.object({
   location: z.string().trim().min(1).max(150).optional(),
   imageUrl: imageUrlSchema.optional(),
   images: z.array(imageUrlSchema).min(1).max(10).optional(),
+  color: z.enum(COLOR_OPTIONS).optional(),
+  bodyType: z.enum(BODY_TYPE_OPTIONS).optional(),
   reviewNote: reviewNoteSchema,
 }).strict().refine(
   ({ imageUrl, images }) => !imageUrl || !images || imageUrl === images[0],

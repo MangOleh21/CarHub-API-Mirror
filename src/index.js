@@ -4,6 +4,7 @@ import { createPool } from './config/pool.js';
 import { createCarsModel } from './models/carsModel.js';
 import { createAdminsModel } from './models/adminsModel.js';
 import { createSubmissionsModel } from './models/submissionsModel.js';
+import { createUsersModel } from './models/usersModel.js';
 import { parseAllowedOrigins } from './config/origins.js';
 
 const port = Number(process.env.PORT ?? 5000);
@@ -17,6 +18,7 @@ const server = createApp({
   carModel: createCarsModel(pool),
   submissionModel: createSubmissionsModel(pool),
   adminModel: createAdminsModel(pool),
+  userModel: createUsersModel(pool),
   allowedOrigins: parseAllowedOrigins(),
 }).listen(port, () => {
   console.log(`CarHub API listening on port ${port}`);

@@ -72,7 +72,10 @@ function createPool(submissionRow) {
 test('approval atomically creates a car and prefers seller data over admin fallbacks', async () => {
   const sellerSubmission = {
     ...submission,
+    userId: '42',
     fuelType: 'Hybrid',
+    color: 'Putih',
+    bodyType: 'MPV',
     imageUrl: 'https://seller.example/car.jpg',
     images: [
       'https://seller.example/car.jpg',
@@ -109,11 +112,14 @@ test('approval atomically creates a car and prefers seller data over admin fallb
     },
     car: { id: '91' },
   });
-  assert.equal(insertCall.values[6], '180000000');
-  assert.equal(insertCall.values[4], 'Hybrid');
-  assert.equal(insertCall.values[7], 'https://seller.example/car.jpg');
-  assert.deepEqual(insertCall.values[8], sellerSubmission.images);
-  assert.equal(insertCall.values[11], 'Bandung');
+  assert.equal(insertCall.values[0], '42');
+  assert.equal(insertCall.values[5], 'Hybrid');
+  assert.equal(insertCall.values[6], 'Putih');
+  assert.equal(insertCall.values[7], 'MPV');
+  assert.equal(insertCall.values[9], '180000000');
+  assert.equal(insertCall.values[10], 'https://seller.example/car.jpg');
+  assert.deepEqual(insertCall.values[11], sellerSubmission.images);
+  assert.equal(insertCall.values[14], 'Bandung');
   assert.match(
     calls.find(({ statement }) => statement.startsWith('UPDATE submissions')).statement,
     /reviewed_at = NOW\(\)/,
@@ -144,6 +150,7 @@ test('submission model stores the image gallery alongside its first-image alias'
   });
 
   const result = await model.create({
+    userId: '42',
     sellerName: 'Ayu',
     sellerPhone: '628123456789',
     brand: 'Toyota',
@@ -151,6 +158,8 @@ test('submission model stores the image gallery alongside its first-image alias'
     year: 2020,
     transmission: 'Automatic',
     fuelType: 'Diesel',
+    color: 'Hitam',
+    bodyType: 'SUV',
     mileage: 25_000,
     expectedPrice: 180_000_000,
     location: 'Jakarta',
@@ -164,10 +173,14 @@ test('submission model stores the image gallery alongside its first-image alias'
     createdAt: '2026-11-24T00:00:00.000Z',
   });
   assert.match(calls[0].statement, /INSERT INTO submissions/);
+  assert.match(calls[0].statement, /user_id/);
   assert.match(calls[0].statement, /fuel_type/);
-  assert.equal(calls[0].values[6], 'Diesel');
-  assert.equal(calls[0].values[10], images[0]);
-  assert.deepEqual(calls[0].values[11], images);
+  assert.equal(calls[0].values[0], '42');
+  assert.equal(calls[0].values[7], 'Diesel');
+  assert.equal(calls[0].values[8], 'Hitam');
+  assert.equal(calls[0].values[9], 'SUV');
+  assert.equal(calls[0].values[13], images[0]);
+  assert.deepEqual(calls[0].values[14], images);
 });
 
 test('approval of legacy submission requires missing location or photo before creating a car', async () => {
@@ -197,16 +210,21 @@ test('approval fills missing legacy submission fields from the admin payload', a
     reviewedByEmail: 'admin@example.test',
     location: 'Jakarta',
     imageUrl: 'https://images.example/car.jpg',
+    color: 'Silver',
+    bodyType: 'MPV',
   });
 
   const insertCall = calls.find(({ statement }) => statement.startsWith('INSERT INTO cars'));
   assert.equal(result.kind, 'updated');
   assert.equal(result.submission.reviewedByEmail, 'admin@example.test');
   assert.equal(result.submission.reviewNote, null);
-  assert.equal(insertCall.values[7], 'https://images.example/car.jpg');
-  assert.equal(insertCall.values[4], 'Bensin');
-  assert.deepEqual(insertCall.values[8], ['https://images.example/car.jpg']);
-  assert.equal(insertCall.values[11], 'Jakarta');
+  assert.equal(insertCall.values[0], null);
+  assert.equal(insertCall.values[5], 'Bensin');
+  assert.equal(insertCall.values[6], 'Silver');
+  assert.equal(insertCall.values[7], 'MPV');
+  assert.equal(insertCall.values[10], 'https://images.example/car.jpg');
+  assert.deepEqual(insertCall.values[11], ['https://images.example/car.jpg']);
+  assert.equal(insertCall.values[14], 'Jakarta');
 });
 
 test('a submission that is no longer pending cannot create another catalog car', async () => {

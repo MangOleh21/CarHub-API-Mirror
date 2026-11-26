@@ -1,6 +1,6 @@
 # CarHub Backend API
 
-REST API Express untuk CarHub PWA. Data disimpan di Neon PostgreSQL; fitur publik tidak memerlukan login, sedangkan portal admin memakai sesi berbasis cookie.
+REST API Express untuk CarHub PWA. Data disimpan di Neon PostgreSQL; penjelajahan katalog dan detail mobil tetap terbuka tanpa login, sedangkan pengajuan jual mobil, halaman Profil, dan portal admin masing-masing dilindungi sesi cookie terpisah.
 
 Dibuat oleh Galileo Athari Muhammad (21120124130099) untuk Tugas Akhir Praktikum Pemrograman Perangkat Bergerak 2026.
 
@@ -26,7 +26,7 @@ Backend membaca konfigurasi dari `.env`. Jika file itu belum ada, salin `.env.ex
 | `CLOUDINARY_API_SECRET` | API secret Cloudinary; hanya disimpan di backend |
 | `CLOUDINARY_UPLOAD_PRESET` | Nama upload preset bertipe signed |
 
-Pastikan `DATABASE_URL` menunjuk ke database yang benar sebelum menjalankan migrasi. Runner menerapkan file migration bernomor yang belum tercatat. Migration `005` memperluas pilihan transmisi dan menambahkan kolom bahan bakar nullable pada submission; migration `006` menambahkan `cars.archived_at` secara aditif. Keduanya tidak mengubah data listing yang ada. Migration hanya perlu dijalankan setelah target database dipastikan benar.
+Pastikan `DATABASE_URL` menunjuk ke database yang benar sebelum menjalankan migrasi. Runner menerapkan file migration bernomor yang belum tercatat (`001` hingga `009`). Migration `007` menambahkan kolom `color` dan `body_type` nullable pada `cars` dan `submissions`; migration `008` membuat tabel `users` dan `user_sessions`; migration `009` menambahkan `user_id` nullable pada `submissions` dan `cars`. Seluruh migrasi bersifat aditif dan tidak mengubah data listing lama. Migration hanya perlu dijalankan setelah target database dipastikan benar.
 Untuk upload gambar, isi variabel `CLOUDINARY_*` pada `backend/.env` dan environment backend di Vercel. Buat upload preset Cloudinary bertipe signed. Jangan pernah menaruh `CLOUDINARY_API_SECRET` di frontend, membagikannya, atau meng-commit nilainya. Browser menerima signature sementara dari API, lalu mengirim file langsung ke Cloudinary.
 
 ```bash
@@ -61,10 +61,25 @@ Lihat [dokumentasi lengkap API](./docs/API_DOCUMENTATION.md) untuk skema request
 | Method dan path | Keterangan |
 |---|---|
 | `GET /api/health` | Status API |
-| `GET /api/cars?search=&brand=&transmission=&minPrice=&maxPrice=&minYear=&maxYear=&sortBy=createdAt&sortOrder=desc&page=1&pageSize=20` | Daftar mobil terpaginasikan dengan filter dan pengurutan |
+| `GET /api/cars?search=&brand=&bodyType=&color=&fuelType=&transmission=&minPrice=&maxPrice=&minYear=&maxYear=&sortBy=createdAt&sortOrder=desc&page=1&pageSize=20` | Daftar mobil terpaginasikan dengan filter (`bodyType` mendukung multi-nilai) dan pengurutan |
+| `GET /api/cars/brands` | Daftar merek unik pada katalog aktif |
 | `GET /api/cars/:id` | Detail mobil |
 | `POST /api/uploads/submissions` | Meminta field upload bertanda tangan untuk foto pengajuan |
-| `POST /api/submissions` | Mengirim pengajuan jual mobil; membuat submission berstatus `pending` |
+
+### Autentikasi Pengguna, Profil & Pengajuan Jual
+
+Akun pengguna publik memakai cookie sesi `carhub_user_session` (`HttpOnly`, `path: /api`) yang terpisah dari cookie admin (`carhub_admin_session`). Endpoint mutasi memerlukan header `Origin` yang termasuk dalam `FRONTEND_ORIGINS`.
+
+| Method dan path | Akses | Keterangan |
+|---|---|---|
+| `POST /api/auth/register` | Publik, Origin tepercaya, dibatasi laju | Daftar akun (`name`, `email`, `phone`, `location?`, `password` min. 8 karakter) |
+| `POST /api/auth/login` | Publik, Origin tepercaya, dibatasi laju | Login email + password |
+| `GET /api/auth/session` | Pengguna terautentikasi | Memeriksa sesi aktif |
+| `POST /api/auth/logout` | Origin tepercaya | Mencabut sesi dan menghapus cookie |
+| `GET /api/me` | Pengguna terautentikasi | Membaca profil pengguna aktif |
+| `PATCH /api/me` | Pengguna terautentikasi + Origin tepercaya | Memperbarui `name`, `phone`, `location`, serta `newPassword` (opsional, min. 8 karakter) |
+| `GET /api/me/listings?status=all&page=1&pageSize=20` | Pengguna terautentikasi | Daftar mobil aktif (`cars`) dan pengajuan `pending`/`rejected` milik pengguna (`status`: `all`, `active`, `pending`, `rejected`) |
+| `POST /api/submissions` | Pengguna terautentikasi + Origin tepercaya | Mengirim pengajuan jual mobil; `sellerName`/`sellerPhone` otomatis fallback ke profil jika tidak dikirim |
 
 Contoh body `POST /api/submissions`:
 
@@ -77,8 +92,11 @@ Contoh body `POST /api/submissions`:
   "year": 2020,
   "transmission": "Automatic",
   "fuelType": "Bensin",
+  "color": "Putih",
+  "bodyType": "MPV",
   "mileage": 25000,
   "expectedPrice": 180000000,
+  "location": "Jakarta",
   "images": [
     "https://images.example.test/car.jpg",
     "https://images.example.test/car-side.jpg"
@@ -87,7 +105,7 @@ Contoh body `POST /api/submissions`:
 }
 ```
 
-`location` dan satu hingga sepuluh URL foto HTTPS pada `images` wajib. `transmission` menerima `Manual`, `Automatic`, `CVT`, `DCT`, atau `AMT`. `fuelType` menerima `Bensin`, `Diesel`, `Hybrid`, atau `Listrik`, dan default ke `Bensin` jika tidak dikirim oleh klien lama. Field `imageUrl` tunggal tetap diterima untuk kompatibilitas. `description` opsional. Foto disimpan sebagai URL, bukan file di database.
+`location`, `color`, `bodyType`, dan satu hingga sepuluh URL foto HTTPS pada `images` wajib. `transmission` menerima `Manual`, `Automatic`, `CVT`, `DCT`, atau `AMT`. `fuelType` menerima `Bensin`, `Diesel`, `Hybrid`, atau `Listrik` (default `Bensin`). `bodyType` menerima `SUV`, `MPV`, `Hatchback`, `Sedan`, `LCGC`, `Pickup`, `Van`, `Truck`, atau `Bus`. `color` menerima `Putih`, `Hitam`, `Silver`, `Abu-abu`, `Merah`, `Biru`, `Cokelat`, `Hijau`, `Kuning`, `Oranye`, atau `Lainnya`. Field `imageUrl` tunggal tetap diterima untuk kompatibilitas. `description` opsional. Foto disimpan sebagai URL, bukan file di database.
 
 ### Admin
 
@@ -109,11 +127,16 @@ Admin login memakai cookie sesi HttpOnly; jangan mengirim token lewat LocalStora
 | `GET /api/admin/submissions?status=pending&page=1&pageSize=20` | Admin terautentikasi | Daftar submission terpaginasikan; status default `pending`, filter menerima `pending`, `approved`, `rejected`, atau `all` untuk semua status |
 | `PATCH /api/admin/submissions/:id/approved` | Admin terautentikasi + Origin tepercaya | Menyetujui dan membuat mobil katalog secara atomik |
 | `PATCH /api/admin/submissions/:id/rejected` | Admin terautentikasi + Origin tepercaya | Menolak submission tanpa membuat mobil katalog |
+| `GET /api/admin/customers?search=&status=all&page=1&pageSize=20` | Admin terautentikasi | Daftar akun pengguna publik terpaginasikan (`status`: `all`, `active`, `inactive`) |
+| `GET /api/admin/customers/:id` | Admin terautentikasi | Detail akun pengguna publik |
+| `POST /api/admin/customers` | Admin terautentikasi + Origin tepercaya | Membuat akun pengguna publik baru |
+| `PUT /api/admin/customers/:id` | Admin terautentikasi + Origin tepercaya | Memperbarui data, status aktif, atau reset kata sandi pengguna publik |
+| `DELETE /api/admin/customers/:id` | Admin terautentikasi + Origin tepercaya | Menghapus akun pengguna publik (sesi ikut terhapus; listing tetap tersimpan tanpa pemilik) |
 | `GET /api/admin/users` | Owner | Mendaftar akun owner/admin aktif dan nonaktif tanpa password/hash |
 | `POST /api/admin/users` | Owner | Membuat akun ber-role `admin`; body berisi `email` dan `password` |
 | `PATCH /api/admin/users/:id/deactivate` | Owner | Menonaktifkan akun admin aktif |
 
-Password admin harus 12–128 karakter. Body `POST` dan `PUT` mobil menerima `brand`, `model`, `year`, `transmission`, `fuelType`, `mileage`, `price`, `images` (1–10 URL HTTPS; atau `imageUrl` lama untuk satu foto), `sellerName`, `sellerPhone`, `location`, dan `description`. `fuelType` default ke `Bensin`, `description` boleh `null` atau tidak dikirim. Karena `PUT` mengganti seluruh data, field yang tidak dikirim akan memakai default atau dikosongkan sesuai aturan tersebut. `DELETE /api/admin/cars/:id` mengarsipkan baris mobil; gunakan `PATCH /api/admin/cars/:id/restore` untuk memulihkannya. `DELETE /api/admin/cars/:id/permanent` menghapus permanen hanya baris yang sudah diarsipkan; file foto di object storage tidak dihapus.
+Password admin harus 12–128 karakter. Body `POST` dan `PUT` mobil menerima `brand`, `model`, `year`, `transmission`, `fuelType`, `color`, `bodyType`, `mileage`, `price`, `images` (1–10 URL HTTPS; atau `imageUrl` lama untuk satu foto), `sellerName`, `sellerPhone`, `location`, dan `description`. `fuelType` default ke `Bensin`, `description` boleh `null` atau tidak dikirim. Karena `PUT` mengganti seluruh data, field yang tidak dikirim akan memakai default atau dikosongkan sesuai aturan tersebut. `DELETE /api/admin/cars/:id` mengarsipkan baris mobil; gunakan `PATCH /api/admin/cars/:id/restore` untuk memulihkannya. `DELETE /api/admin/cars/:id/permanent` menghapus permanen hanya baris yang sudah diarsipkan; file foto di object storage tidak dihapus.
 
 Body kedua endpoint menerima `reviewNote` opsional (maksimal 3.000 karakter). Untuk approval, `location` dan/atau `images` juga dapat dikirim jika submission lama belum memilikinya; data yang sudah diberikan penjual tetap dipakai. Email reviewer diambil dari sesi admin dan tidak dapat ditentukan melalui body. Submission yang sudah tidak berstatus `pending` tidak dapat diproses kembali (`409`). Keputusan baru menyimpan email reviewer, catatan, dan `reviewedAt`; nilai historis pada database development dapat memakai `created_at` sebagai perkiraan.
 
@@ -127,12 +150,14 @@ Kirim body yang sama ke `/api/admin/submissions/:id/approved` atau `/api/admin/s
 
 ## Skema database
 
-Migration berada di `migrations/001_initial_schema.sql` hingga `migrations/006_add_car_archive.sql`. Migration `004` menambahkan galeri foto dan timestamp review; migration `005` memperluas opsi transmisi dan menambahkan `submissions.fuel_type` nullable; migration `006` menambahkan `cars.archived_at` nullable. Migration `005` dan `006` tidak memperbarui atau menghapus baris yang sudah ada.
+Migration berada di `migrations/001_initial_schema.sql` hingga `migrations/009_add_listing_owner.sql`. Seluruh migrasi `005`–`009` bersifat aditif dan tidak memperbarui atau menghapus baris yang sudah ada.
 
 | Tabel | Kolom utama |
 |---|---|
-| `cars` | `id`, `brand`, `model`, `year`, `transmission`, `fuel_type`, `mileage`, `price`, `image_url`, `images`, `seller_name`, `seller_phone`, `location`, `description`, `archived_at`, `created_at` |
-| `submissions` | `id`, `seller_name`, `seller_phone`, `brand`, `model`, `year`, `transmission`, `fuel_type`, `mileage`, `expected_price`, `image_url`, `images`, `location`, `description`, `status`, `reviewed_by_email`, `review_note`, `reviewed_at`, `created_at` |
+| `cars` | `id`, `user_id`, `brand`, `model`, `year`, `transmission`, `fuel_type`, `color`, `body_type`, `mileage`, `price`, `image_url`, `images`, `seller_name`, `seller_phone`, `location`, `description`, `archived_at`, `created_at` |
+| `submissions` | `id`, `user_id`, `seller_name`, `seller_phone`, `brand`, `model`, `year`, `transmission`, `fuel_type`, `color`, `body_type`, `mileage`, `expected_price`, `image_url`, `images`, `location`, `description`, `status`, `reviewed_by_email`, `review_note`, `reviewed_at`, `created_at` |
+| `users` | `id`, `name`, `email`, `phone`, `location`, `password_hash`, `is_active`, `created_at` |
+| `user_sessions` | `id`, `user_id`, `token_hash`, `expires_at`, `revoked_at`, `created_at` |
 | `admin_users` | `id`, `email`, `password_hash`, `role` (`owner` atau `admin`), `is_active`, `created_at` |
 | `admin_sessions` | `id`, `admin_user_id`, `token_hash`, `expires_at`, `revoked_at`, `created_at` |
 

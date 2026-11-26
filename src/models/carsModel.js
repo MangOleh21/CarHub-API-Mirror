@@ -5,6 +5,8 @@ const carColumns = `
   year,
   transmission,
   fuel_type AS "fuelType",
+  color,
+  body_type AS "bodyType",
   mileage,
   price::text AS price,
   image_url AS "imageUrl",
@@ -34,6 +36,9 @@ export function createCarsModel(pool) {
       search,
       brand,
       transmission,
+      fuelType,
+      color,
+      bodyType,
       minPrice,
       maxPrice,
       minYear,
@@ -61,6 +66,8 @@ export function createCarsModel(pool) {
 
       for (const [column, operator, value] of [
         ['transmission', '=', transmission],
+        ['fuel_type', '=', fuelType],
+        ['color', '=', color],
         ['price', '>=', minPrice],
         ['price', '<=', maxPrice],
         ['year', '>=', minYear],
@@ -70,6 +77,16 @@ export function createCarsModel(pool) {
           values.push(value);
           filters.push(`${column} ${operator} $${values.length}`);
         }
+      }
+
+      const bodyTypes = Array.isArray(bodyType)
+        ? bodyType
+        : bodyType !== undefined
+          ? [bodyType]
+          : [];
+      if (bodyTypes.length > 0) {
+        values.push(bodyTypes);
+        filters.push(`body_type = ANY($${values.length}::text[])`);
       }
 
       const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
@@ -115,6 +132,8 @@ export function createCarsModel(pool) {
            year,
            transmission,
            fuel_type,
+           color,
+           body_type,
            mileage,
            price,
            image_url,
@@ -124,7 +143,7 @@ export function createCarsModel(pool) {
            location,
            description
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
          RETURNING ${carColumns}`,
         [
           input.brand,
@@ -132,6 +151,8 @@ export function createCarsModel(pool) {
           input.year,
           input.transmission,
           input.fuelType,
+          input.color ?? null,
+          input.bodyType ?? null,
           input.mileage,
           input.price,
           input.imageUrl,
@@ -153,15 +174,17 @@ export function createCarsModel(pool) {
              year = $3,
              transmission = $4,
              fuel_type = $5,
-             mileage = $6,
-             price = $7,
-             image_url = $8,
-             images = $9,
-             seller_name = $10,
-             seller_phone = $11,
-             location = $12,
-             description = $13
-         WHERE id = $14
+             color = $6,
+             body_type = $7,
+             mileage = $8,
+             price = $9,
+             image_url = $10,
+             images = $11,
+             seller_name = $12,
+             seller_phone = $13,
+             location = $14,
+             description = $15
+         WHERE id = $16
          RETURNING ${carColumns}`,
         [
           input.brand,
@@ -169,6 +192,8 @@ export function createCarsModel(pool) {
           input.year,
           input.transmission,
           input.fuelType,
+          input.color ?? null,
+          input.bodyType ?? null,
           input.mileage,
           input.price,
           input.imageUrl,

@@ -7,19 +7,37 @@ import { createPool } from './config/pool.js';
 import { createAdminsModel } from './models/adminsModel.js';
 import { createCarsModel } from './models/carsModel.js';
 import { createSubmissionsModel } from './models/submissionsModel.js';
+import { createUsersModel } from './models/usersModel.js';
 import { registerAdminAuthRoutes } from './routes/adminAuthRoutes.js';
 import { registerAdminCarsRoutes } from './routes/adminCarsRoutes.js';
+import { registerAdminCustomersRoutes } from './routes/adminCustomersRoutes.js';
 import { registerAdminSubmissionsRoutes } from './routes/adminSubmissionsRoutes.js';
 import { registerAdminUsersRoutes } from './routes/adminUsersRoutes.js';
 import { registerCarRoutes } from './routes/carsRoutes.js';
 import { registerImageUploadRoutes } from './routes/imageUploadRoutes.js';
 import { registerSubmissionRoutes } from './routes/submissionsRoutes.js';
+import { registerUserAuthRoutes } from './routes/userAuthRoutes.js';
 import { createImageUpload } from './services/image-upload.js';
+
+const defaultUserModel = {
+  async findByEmail() { return null; },
+  async findById() { return null; },
+  async create() { return null; },
+  async updateProfile() { return null; },
+  async listUsers() { return { items: [], totalItems: 0 }; },
+  async updateByAdmin() { return { kind: 'not_found' }; },
+  async deleteById() { return null; },
+  async listListingsByUser() { return { items: [], totalItems: 0 }; },
+  async createSession() {},
+  async getActiveSession() { return null; },
+  async revokeSession() {},
+};
 
 export function createApp({
   carModel,
   submissionModel,
   adminModel,
+  userModel = defaultUserModel,
   allowedOrigins = parseAllowedOrigins(),
   logger = console,
   imageUploadService = createImageUpload,
@@ -47,8 +65,10 @@ export function createApp({
 
   registerCarRoutes(app, { carModel });
   registerAdminCarsRoutes(app, { carModel, adminModel, allowedOrigins });
-  registerSubmissionRoutes(app, { submissionModel });
+  registerSubmissionRoutes(app, { submissionModel, userModel, allowedOrigins });
+  registerUserAuthRoutes(app, { userModel, allowedOrigins });
   registerAdminAuthRoutes(app, { adminModel, allowedOrigins });
+  registerAdminCustomersRoutes(app, { userModel, adminModel, allowedOrigins });
   registerAdminSubmissionsRoutes(app, { submissionModel, adminModel, allowedOrigins });
   registerAdminUsersRoutes(app, { adminModel, allowedOrigins });
   registerImageUploadRoutes(app, { adminModel, allowedOrigins, imageUploadService });
@@ -119,6 +139,7 @@ export default function vercelHandler(request, response) {
       carModel: createCarsModel(pool),
       submissionModel: createSubmissionsModel(pool),
       adminModel: createAdminsModel(pool),
+      userModel: createUsersModel(pool),
       allowedOrigins: parseAllowedOrigins(),
     });
   }

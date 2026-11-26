@@ -11,6 +11,8 @@ const carInput = {
   model: 'Avanza',
   year: 2020,
   transmission: 'Automatic',
+  color: 'Putih',
+  bodyType: 'MPV',
   mileage: 25_000,
   price: 180_000_000,
   imageUrl: 'https://images.example/car.jpg',
@@ -140,6 +142,8 @@ test('admin can create a car with validated catalog fields', async () => {
     assert.equal(response.status, 201);
     assert.equal(receivedInput.transmission, 'DCT');
     assert.equal(receivedInput.fuelType, 'Bensin');
+    assert.equal(receivedInput.color, 'Putih');
+    assert.equal(receivedInput.bodyType, 'MPV');
     assert.equal(receivedInput.description, null);
     assert.deepEqual(response.body.data, car);
   } finally {

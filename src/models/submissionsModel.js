@@ -1,5 +1,6 @@
 const submissionColumns = `
   id::text AS id,
+  user_id::text AS "userId",
   seller_name AS "sellerName",
   seller_phone AS "sellerPhone",
   brand,
@@ -7,6 +8,8 @@ const submissionColumns = `
   year,
   transmission,
   fuel_type AS "fuelType",
+  color,
+  body_type AS "bodyType",
   mileage,
   expected_price::text AS "expectedPrice",
   image_url AS "imageUrl",
@@ -43,6 +46,7 @@ export function createSubmissionsModel(pool) {
     async create(input) {
       const result = await pool.query(
         `INSERT INTO submissions (
+           user_id,
            seller_name,
            seller_phone,
            brand,
@@ -50,6 +54,8 @@ export function createSubmissionsModel(pool) {
            year,
            transmission,
            fuel_type,
+           color,
+           body_type,
            mileage,
            expected_price,
            location,
@@ -57,9 +63,10 @@ export function createSubmissionsModel(pool) {
            images,
            description
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          RETURNING id::text AS id, status, created_at AS "createdAt"`,
         [
+          input.userId ?? null,
           input.sellerName,
           input.sellerPhone,
           input.brand,
@@ -67,6 +74,8 @@ export function createSubmissionsModel(pool) {
           input.year,
           input.transmission,
           input.fuelType ?? 'Bensin',
+          input.color ?? null,
+          input.bodyType ?? null,
           input.mileage,
           input.expectedPrice,
           input.location,
@@ -154,13 +163,18 @@ export function createSubmissionsModel(pool) {
           return { kind: 'missing_fields', fields: missingFields };
         }
 
+        const color = submission.color || input.color || null;
+        const bodyType = submission.bodyType || input.bodyType || null;
         const carResult = await client.query(
           `INSERT INTO cars (
+             user_id,
              brand,
              model,
              year,
              transmission,
              fuel_type,
+             color,
+             body_type,
              mileage,
              price,
              image_url,
@@ -170,14 +184,17 @@ export function createSubmissionsModel(pool) {
              location,
              description
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
            RETURNING id::text AS id`,
           [
+            submission.userId ?? null,
             submission.brand,
             submission.model,
             submission.year,
             submission.transmission,
             submission.fuelType ?? 'Bensin',
+            color,
+            bodyType,
             submission.mileage,
             submission.expectedPrice,
             images[0],

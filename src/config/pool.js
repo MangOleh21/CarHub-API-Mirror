@@ -30,7 +30,7 @@ export function createPool(databaseUrl = process.env.DATABASE_URL) {
   return new Pool({
     connectionString: normalizeSslMode(databaseUrl),
     max: 5,
-    connectionTimeoutMillis: 5_000,
+    connectionTimeoutMillis: 15_000,
     idleTimeoutMillis: 30_000,
   });
 }

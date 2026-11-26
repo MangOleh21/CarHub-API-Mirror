@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  BODY_TYPE_OPTIONS,
+  COLOR_OPTIONS,
+  FUEL_TYPE_OPTIONS,
+  TRANSMISSION_OPTIONS,
+} from '../constants/car-options.js';
 import { verifyManagedImage } from '../services/verify-image.js';
 
 const imageUrlSchema = z.string().url()
@@ -8,8 +14,10 @@ const carInputSchema = z.object({
   brand: z.string().trim().min(1).max(100),
   model: z.string().trim().min(1).max(100),
   year: z.number().int().min(1886).max(2100),
-  transmission: z.enum(['Manual', 'Automatic', 'CVT', 'DCT', 'AMT']),
-  fuelType: z.string().trim().min(1).max(50).default('Bensin'),
+  transmission: z.enum(TRANSMISSION_OPTIONS),
+  fuelType: z.enum(FUEL_TYPE_OPTIONS).default('Bensin'),
+  color: z.enum(COLOR_OPTIONS),
+  bodyType: z.enum(BODY_TYPE_OPTIONS),
   mileage: z.number().int().min(0).max(2_147_483_647),
   price: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   imageUrl: imageUrlSchema.optional(),

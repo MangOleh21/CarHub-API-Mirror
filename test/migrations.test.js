@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { BODY_TYPE_OPTIONS, COLOR_OPTIONS } from '../src/constants/car-options.js';
 import { runMigrations } from '../src/database/migrationRunner.js';
 
 const migrationDirectory = fileURLToPath(new URL('../migrations/', import.meta.url));
@@ -44,8 +45,11 @@ test('migration runner applies each numbered migration once in order', async () 
     '004_add_car_images_and_reviewed_at',
     '005_add_submission_fuel_type_and_transmission_options',
     '006_add_car_archive',
+    '007_add_car_color_and_body_type',
+    '008_add_users',
+    '009_add_listing_owner',
   ]);
-  assert.equal(firstRunSqlCount, 6);
+  assert.equal(firstRunSqlCount, 9);
   assert.equal(appliedSql.length, firstRunSqlCount);
   assert.match(appliedSql[1], /ALTER TABLE submissions ADD COLUMN location/);
   assert.match(appliedSql[2], /ADD COLUMN reviewed_by_email/);
@@ -56,4 +60,16 @@ test('migration runner applies each numbered migration once in order', async () 
   assert.match(appliedSql[4], /ADD COLUMN IF NOT EXISTS fuel_type VARCHAR\(50\)/);
   assert.doesNotMatch(appliedSql[4], /\bUPDATE\b/);
   assert.match(appliedSql[5], /ALTER TABLE cars\s+ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ/);
+  assert.match(appliedSql[6], /ADD COLUMN IF NOT EXISTS color VARCHAR\(30\)/);
+  assert.match(appliedSql[6], /ADD COLUMN IF NOT EXISTS body_type VARCHAR\(30\)/);
+  assert.match(appliedSql[7], /CREATE TABLE IF NOT EXISTS users/);
+  assert.match(appliedSql[7], /CREATE TABLE IF NOT EXISTS user_sessions/);
+  assert.match(appliedSql[8], /ALTER TABLE submissions\s+ADD COLUMN IF NOT EXISTS user_id BIGINT/);
+  assert.match(appliedSql[8], /ALTER TABLE cars\s+ADD COLUMN IF NOT EXISTS user_id BIGINT/);
+  for (const color of COLOR_OPTIONS) {
+    assert.ok(appliedSql[6].includes(`'${color}'`), `Missing color ${color} in migration 007`);
+  }
+  for (const bodyType of BODY_TYPE_OPTIONS) {
+    assert.ok(appliedSql[6].includes(`'${bodyType}'`), `Missing bodyType ${bodyType} in migration 007`);
+  }
 });

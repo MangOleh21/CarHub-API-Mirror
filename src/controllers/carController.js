@@ -1,12 +1,35 @@
 import { z } from 'zod';
+import {
+  BODY_TYPE_OPTIONS,
+  COLOR_OPTIONS,
+  FUEL_TYPE_OPTIONS,
+  TRANSMISSION_OPTIONS,
+} from '../constants/car-options.js';
 
 const optionalFilter = z.string().trim().max(100).optional()
   .transform((value) => value || undefined);
 
+function parseBodyTypeQuery(value) {
+  if (value === undefined) return undefined;
+  const rawItems = Array.isArray(value) ? value : [value];
+  const flattened = rawItems
+    .flatMap((entry) => (typeof entry === 'string' ? entry.split(',') : [entry]))
+    .map((entry) => (typeof entry === 'string' ? entry.trim() : entry))
+    .filter((entry) => entry !== '');
+  if (flattened.length === 0) return undefined;
+  return [...new Set(flattened)];
+}
+
 const listQueryFields = {
   search: optionalFilter,
   brand: optionalFilter,
-  transmission: z.enum(['Manual', 'Automatic', 'CVT', 'DCT', 'AMT']).optional(),
+  transmission: z.enum(TRANSMISSION_OPTIONS).optional(),
+  fuelType: z.enum(FUEL_TYPE_OPTIONS).optional(),
+  color: z.enum(COLOR_OPTIONS).optional(),
+  bodyType: z.preprocess(
+    parseBodyTypeQuery,
+    z.array(z.enum(BODY_TYPE_OPTIONS)).min(1).max(BODY_TYPE_OPTIONS.length).optional(),
+  ),
   minPrice: z.coerce.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional(),
   maxPrice: z.coerce.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional(),
   minYear: z.coerce.number().int().min(1886).max(2100).optional(),

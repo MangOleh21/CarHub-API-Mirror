@@ -2,6 +2,8 @@ import { createHash, randomBytes } from 'node:crypto';
 
 export const sessionCookieName = 'carhub_admin_session';
 export const sessionDurationMs = 8 * 60 * 60 * 1000;
+export const userSessionCookieName = 'carhub_user_session';
+export const userSessionDurationMs = 7 * 24 * 60 * 60 * 1000;
 
 export function createSessionToken() {
   return randomBytes(32).toString('base64url');
@@ -11,7 +13,10 @@ export function hashSessionToken(token) {
   return createHash('sha256').update(token).digest('hex');
 }
 
-export function getSessionCookieOptions(environment = process.env) {
+export function getSessionCookieOptions(
+  environment = process.env,
+  { path = '/api/admin', maxAge = sessionDurationMs } = {},
+) {
   const sameSite = (environment.ADMIN_COOKIE_SAME_SITE ?? 'lax').toLowerCase();
   if (!['lax', 'strict', 'none'].includes(sameSite)) {
     throw new Error('ADMIN_COOKIE_SAME_SITE must be lax, strict, or none');
@@ -27,7 +32,14 @@ export function getSessionCookieOptions(environment = process.env) {
     httpOnly: true,
     secure,
     sameSite,
-    path: '/api/admin',
-    maxAge: sessionDurationMs,
+    path,
+    maxAge,
   };
+}
+
+export function getUserSessionCookieOptions(environment = process.env) {
+  return getSessionCookieOptions(environment, {
+    path: '/api',
+    maxAge: userSessionDurationMs,
+  });
 }

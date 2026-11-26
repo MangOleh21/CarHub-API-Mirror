@@ -121,11 +121,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sellerName\": \"Postman Tester\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"mileage\": 25000,\n  \"expectedPrice\": 180000000,\n  \"location\": \"Jakarta\",\n  \"imageUrl\": \"https://images.example.test/carhub-postman-test.jpg\",\n  \"description\": \"Submission uji dari Postman; hapus atau moderasi data ini setelah pengujian.\"\n}",
+              "raw": "{\n  \"sellerName\": \"Postman Tester\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"fuelType\": \"Bensin\",\n  \"color\": \"Putih\",\n  \"bodyType\": \"MPV\",\n  \"mileage\": 25000,\n  \"expectedPrice\": 180000000,\n  \"location\": \"Jakarta\",\n  \"imageUrl\": \"https://images.example.test/carhub-postman-test.jpg\",\n  \"description\": \"Submission uji dari Postman; hapus atau moderasi data ini setelah pengujian.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -250,6 +254,110 @@
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "User auth & profile",
+      "item": [
+        {
+          "name": "User register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Seller\",\n  \"email\": \"{{userEmail}}\",\n  \"phone\": \"+6281234567890\",\n  \"location\": \"Semarang\",\n  \"password\": \"{{userPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/auth/register",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "User login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/auth/login",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get current user profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/me",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "me"]
+            }
+          }
+        },
+        {
+          "name": "List my listings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/me/listings?status=all&page=1&pageSize=10",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "me", "listings"],
+              "query": [
+                { "key": "status", "value": "all" },
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "User logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/auth/logout",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "auth", "logout"]
+            }
+          }
         }
       ]
     },
@@ -571,7 +679,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"mileage\": 25000,\n  \"price\": 180000000,\n  \"imageUrl\": \"https://images.example.test/carhub-admin-test.jpg\",\n  \"sellerName\": \"Admin Test\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"location\": \"Jakarta\",\n  \"description\": \"Data uji CRUD admin\"\n}",
+              "raw": "{\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"fuelType\": \"Bensin\",\n  \"color\": \"Putih\",\n  \"bodyType\": \"MPV\",\n  \"mileage\": 25000,\n  \"price\": 180000000,\n  \"imageUrl\": \"https://images.example.test/carhub-admin-test.jpg\",\n  \"sellerName\": \"Admin Test\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"location\": \"Jakarta\",\n  \"description\": \"Data uji CRUD admin\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -641,7 +749,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza Veloz\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"mileage\": 25000,\n  \"price\": 185000000,\n  \"imageUrl\": \"https://images.example.test/carhub-admin-test.jpg\",\n  \"sellerName\": \"Admin Test\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"location\": \"Jakarta\",\n  \"description\": \"Data uji CRUD admin; sudah diperbarui\"\n}",
+              "raw": "{\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza Veloz\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"fuelType\": \"Bensin\",\n  \"color\": \"Hitam\",\n  \"bodyType\": \"MPV\",\n  \"mileage\": 25000,\n  \"price\": 185000000,\n  \"imageUrl\": \"https://images.example.test/carhub-admin-test.jpg\",\n  \"sellerName\": \"Admin Test\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"location\": \"Jakarta\",\n  \"description\": \"Data uji CRUD admin; sudah diperbarui\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
