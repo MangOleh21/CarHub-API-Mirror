@@ -5,11 +5,12 @@ import { test } from 'node:test';
 import { createApp } from '../src/app.js';
 
 const origin = 'http://localhost:5173';
-const sessionCookie = 'carhub_admin_session=test-token';
+const sessionCookie = 'carhub_user_session=test-token';
 
 async function createClient(options = {}) {
   const admin = options.admin ?? {
     id: '2',
+    name: 'Moderator CarHub',
     email: 'admin@example.test',
     role: 'admin',
     isActive: true,
@@ -170,6 +171,7 @@ test('admin can approve a submission with a server-recorded reviewer and optiona
             id,
             status: 'approved',
             reviewedByEmail: input.reviewedByEmail,
+            reviewedByName: input.reviewedByName,
             reviewNote: input.reviewNote,
             reviewedAt: '2026-11-24T00:00:00.000Z',
           },
@@ -199,6 +201,7 @@ test('admin can approve a submission with a server-recorded reviewer and optiona
       id: '8',
       status: 'approved',
       reviewedByEmail: 'admin@example.test',
+      reviewedByName: 'Moderator CarHub',
       reviewNote: 'Dokumen dan kondisi kendaraan sudah diperiksa.',
       location: 'Jakarta',
       images: [
@@ -211,6 +214,7 @@ test('admin can approve a submission with a server-recorded reviewer and optiona
         id: '8',
         status: 'approved',
         reviewedByEmail: 'admin@example.test',
+        reviewedByName: 'Moderator CarHub',
         reviewNote: 'Dokumen dan kondisi kendaraan sudah diperiksa.',
         reviewedAt: '2026-11-24T00:00:00.000Z',
       },
@@ -276,6 +280,7 @@ test('admin can reject without a note and cannot approve legacy data without req
       id: '9',
       status: 'approved',
       reviewedByEmail: 'admin@example.test',
+      reviewedByName: 'Moderator CarHub',
       reviewNote: null,
     });
   } finally {

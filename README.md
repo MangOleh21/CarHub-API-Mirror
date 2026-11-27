@@ -26,7 +26,7 @@ Backend membaca konfigurasi dari `.env`. Jika file itu belum ada, salin `.env.ex
 | `CLOUDINARY_API_SECRET` | API secret Cloudinary; hanya disimpan di backend |
 | `CLOUDINARY_UPLOAD_PRESET` | Nama upload preset bertipe signed |
 
-Pastikan `DATABASE_URL` menunjuk ke database yang benar sebelum menjalankan migrasi. Runner menerapkan file migration bernomor yang belum tercatat (`001` hingga `009`). Migration `007` menambahkan kolom `color` dan `body_type` nullable pada `cars` dan `submissions`; migration `008` membuat tabel `users` dan `user_sessions`; migration `009` menambahkan `user_id` nullable pada `submissions` dan `cars`. Seluruh migrasi bersifat aditif dan tidak mengubah data listing lama. Migration hanya perlu dijalankan setelah target database dipastikan benar.
+Pastikan `DATABASE_URL` menunjuk ke database yang benar sebelum menjalankan migrasi. Runner menerapkan file migration bernomor yang belum tercatat (`001` hingga `010`). Migration `007` menambahkan kolom `color` dan `body_type` nullable pada `cars` dan `submissions`; migration `008` membuat tabel `users` dan `user_sessions`; migration `009` menambahkan `user_id` nullable pada `submissions` dan `cars`; migration `010` menggabungkan `admin_users` ke tabel `users` (menambahkan kolom `role`), menghapus `admin_users`/`admin_sessions`, serta menambahkan `submissions.reviewed_by_name`. Migration hanya perlu dijalankan setelah target database dipastikan benar.
 Untuk upload gambar, isi variabel `CLOUDINARY_*` pada `backend/.env` dan environment backend di Vercel. Buat upload preset Cloudinary bertipe signed. Jangan pernah menaruh `CLOUDINARY_API_SECRET` di frontend, membagikannya, atau meng-commit nilainya. Browser menerima signature sementara dari API, lalu mengirim file langsung ke Cloudinary.
 
 ```bash
@@ -68,7 +68,7 @@ Lihat [dokumentasi lengkap API](./docs/API_DOCUMENTATION.md) untuk skema request
 
 ### Autentikasi Pengguna, Profil & Pengajuan Jual
 
-Akun pengguna publik memakai cookie sesi `carhub_user_session` (`HttpOnly`, `path: /api`) yang terpisah dari cookie admin (`carhub_admin_session`). Endpoint mutasi memerlukan header `Origin` yang termasuk dalam `FRONTEND_ORIGINS`.
+Seluruh akun (`user`, `admin`, `owner`) tersimpan pada tabel terpadu `users` dan memakai satu cookie sesi `carhub_user_session` (`HttpOnly`, `path: /api`). Endpoint admin memverifikasi `role IN ('admin', 'owner')` (atau `owner` untuk `/api/admin/users`). Endpoint mutasi memerlukan header `Origin` yang termasuk dalam `FRONTEND_ORIGINS`.
 
 | Method dan path | Akses | Keterangan |
 |---|---|---|
@@ -133,7 +133,9 @@ Admin login memakai cookie sesi HttpOnly; jangan mengirim token lewat LocalStora
 | `PUT /api/admin/customers/:id` | Admin terautentikasi + Origin tepercaya | Memperbarui data, status aktif, atau reset kata sandi pengguna publik |
 | `DELETE /api/admin/customers/:id` | Admin terautentikasi + Origin tepercaya | Menghapus akun pengguna publik (sesi ikut terhapus; listing tetap tersimpan tanpa pemilik) |
 | `GET /api/admin/users` | Owner | Mendaftar akun owner/admin aktif dan nonaktif tanpa password/hash |
-| `POST /api/admin/users` | Owner | Membuat akun ber-role `admin`; body berisi `email` dan `password` |
+| `POST /api/admin/users` | Owner | Membuat akun ber-role `admin` (`name?`, `email`, `phone?`, `location?`, `password` min. 12 karakter) |
+| `PUT /api/admin/users/:id` | Owner | Memperbarui data, status aktif, atau reset kata sandi akun ber-role `admin` (akun `owner` dilindungi) |
+| `DELETE /api/admin/users/:id` | Owner | Menghapus akun ber-role `admin` (akun `owner` dilindungi) |
 | `PATCH /api/admin/users/:id/deactivate` | Owner | Menonaktifkan akun admin aktif |
 
 Password admin harus 12–128 karakter. Body `POST` dan `PUT` mobil menerima `brand`, `model`, `year`, `transmission`, `fuelType`, `color`, `bodyType`, `mileage`, `price`, `images` (1–10 URL HTTPS; atau `imageUrl` lama untuk satu foto), `sellerName`, `sellerPhone`, `location`, dan `description`. `fuelType` default ke `Bensin`, `description` boleh `null` atau tidak dikirim. Karena `PUT` mengganti seluruh data, field yang tidak dikirim akan memakai default atau dikosongkan sesuai aturan tersebut. `DELETE /api/admin/cars/:id` mengarsipkan baris mobil; gunakan `PATCH /api/admin/cars/:id/restore` untuk memulihkannya. `DELETE /api/admin/cars/:id/permanent` menghapus permanen hanya baris yang sudah diarsipkan; file foto di object storage tidak dihapus.
@@ -150,16 +152,14 @@ Kirim body yang sama ke `/api/admin/submissions/:id/approved` atau `/api/admin/s
 
 ## Skema database
 
-Migration berada di `migrations/001_initial_schema.sql` hingga `migrations/009_add_listing_owner.sql`. Seluruh migrasi `005`–`009` bersifat aditif dan tidak memperbarui atau menghapus baris yang sudah ada.
+Migration berada di `migrations/001_initial_schema.sql` hingga `migrations/010_merge_admins_into_users.sql`. Mulai migrasi `010`, akun pengguna publik, admin, dan owner berada pada satu tabel `users` dengan satu tabel sesi `user_sessions`.
 
 | Tabel | Kolom utama |
 |---|---|
 | `cars` | `id`, `user_id`, `brand`, `model`, `year`, `transmission`, `fuel_type`, `color`, `body_type`, `mileage`, `price`, `image_url`, `images`, `seller_name`, `seller_phone`, `location`, `description`, `archived_at`, `created_at` |
-| `submissions` | `id`, `user_id`, `seller_name`, `seller_phone`, `brand`, `model`, `year`, `transmission`, `fuel_type`, `color`, `body_type`, `mileage`, `expected_price`, `image_url`, `images`, `location`, `description`, `status`, `reviewed_by_email`, `review_note`, `reviewed_at`, `created_at` |
-| `users` | `id`, `name`, `email`, `phone`, `location`, `password_hash`, `is_active`, `created_at` |
+| `submissions` | `id`, `user_id`, `seller_name`, `seller_phone`, `brand`, `model`, `year`, `transmission`, `fuel_type`, `color`, `body_type`, `mileage`, `expected_price`, `image_url`, `images`, `location`, `description`, `status`, `reviewed_by_email`, `reviewed_by_name`, `review_note`, `reviewed_at`, `created_at` |
+| `users` | `id`, `name`, `email`, `phone`, `location`, `role` (`user`, `admin`, `owner`), `password_hash`, `is_active`, `created_at` |
 | `user_sessions` | `id`, `user_id`, `token_hash`, `expires_at`, `revoked_at`, `created_at` |
-| `admin_users` | `id`, `email`, `password_hash`, `role` (`owner` atau `admin`), `is_active`, `created_at` |
-| `admin_sessions` | `id`, `admin_user_id`, `token_hash`, `expires_at`, `revoked_at`, `created_at` |
 
 ID database bertipe `BIGINT` dan dikirim API sebagai string agar tidak kehilangan presisi. Nilai harga pada katalog juga dikirim sebagai string; nilai angka pada body pengajuan dikirim sebagai JSON number.
 

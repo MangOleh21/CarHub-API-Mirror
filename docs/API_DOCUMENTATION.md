@@ -71,12 +71,12 @@ Filter yang digunakan bersamaan harus cocok semuanya (khusus `bodyType` multi-ni
 
 ### Autentikasi sesi dan Origin
 
-CarHub memakai dua cookie sesi `HttpOnly` yang **sepenuhnya terpisah** (cookie pengguna tidak pernah memberi akses admin, dan cookie admin tidak pernah memberi akses pengguna):
+CarHub memakai satu tabel akun terpadu (`users` dengan kolom `role`: `user`, `admin`, `owner`), satu tabel sesi (`user_sessions`), dan satu cookie sesi `HttpOnly` bernama **`carhub_user_session`** (`path: '/api'`, masa berlaku 7 hari):
 
-| Jenis sesi | Nama cookie | Path | Masa berlaku | Dipakai pada |
-|---|---|---|---:|---|
-| Pengguna publik | `carhub_user_session` | `/api` | 7 hari | `/api/auth/*`, `/api/me*`, `POST /api/submissions` |
-| Admin / Owner | `carhub_admin_session` | `/api/admin` | 8 jam | `/api/admin/*` |
+- Endpoint pengguna (`/api/auth/session`, `/api/me*`, `POST /api/submissions`) menerima sesi aktif untuk semua role (`user`, `admin`, `owner`).
+- Endpoint portal admin (`/api/admin/*`) memverifikasi sesi aktif **dan** memeriksa `role IN ('admin', 'owner')` (role `user` ditolak dengan `403 FORBIDDEN`).
+- Endpoint manajemen akun admin (`/api/admin/users*`) memverifikasi `role = 'owner'`.
+- Endpoint manajemen pengguna (`/api/admin/customers*`) hanya mengelola baris ber-role `user`.
 
 - Cookie memakai `Secure` ketika `NODE_ENV=production` atau `ADMIN_COOKIE_SECURE=true`; `SameSite` default-nya `lax` dan dapat diatur dengan `ADMIN_COOKIE_SAME_SITE` (`none` wajib bersama `Secure`).
 - Pemanggilan dari browser lintas-origin harus menyertakan credentials (`credentials: "include"` pada `fetch` atau `withCredentials: true` pada Axios), dan origin frontend harus ada di `FRONTEND_ORIGINS`.
@@ -599,7 +599,15 @@ Mengambil daftar akun owner/admin beserta status aktif dan waktu pembuatan.
 
 ### `POST /api/admin/users`
 
-Membuat akun dengan role `admin` (`email`, `password` 12–128 karakter). Respons `201`.
+Membuat akun dengan role `admin` (`name?`, `email`, `phone?`, `location?`, `isActive?`, `password` 12–128 karakter). Respons `201`.
+
+### `PUT /api/admin/users/:id`
+
+Memperbarui data, status aktif, atau reset kata sandi (`password` opsional, 12–128 karakter) untuk akun ber-role `admin`. Jika `isActive` diubah menjadi `false`, sesi aktif langsung dicabut. Akun `owner` dilindungi (`404 ADMIN_NOT_FOUND`). Respons `200`.
+
+### `DELETE /api/admin/users/:id`
+
+Menghapus permanen akun ber-role `admin` (`user_sessions` ikut terhapus, riwayat review tetap tersimpan). Akun `owner` tidak dapat dihapus (`404 ADMIN_NOT_FOUND`). Respons `204`.
 
 ### `PATCH /api/admin/users/:id/deactivate`
 
@@ -662,6 +670,7 @@ Menonaktifkan akun aktif ber-role `admin` dan mencabut sesi aktifnya. Owner tida
   "description": "Kondisi terawat",
   "status": "pending",
   "reviewedByEmail": null,
+  "reviewedByName": null,
   "reviewNote": null,
   "reviewedAt": null,
   "createdAt": "2026-11-26T10:30:00.000Z"
@@ -677,6 +686,7 @@ Menonaktifkan akun aktif ber-role `admin` dan mencabut sesi aktifnya. Owner tida
   "email": "budi@example.test",
   "phone": "+6281234567890",
   "location": "Semarang",
+  "role": "user",
   "createdAt": "2026-11-26T10:00:00.000Z"
 }
 ```

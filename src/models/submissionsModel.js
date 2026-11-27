@@ -22,21 +22,63 @@ const submissionColumns = `
   description,
   status,
   reviewed_by_email AS "reviewedByEmail",
+  reviewed_by_name AS "reviewedByName",
   review_note AS "reviewNote",
   reviewed_at AS "reviewedAt",
   created_at AS "createdAt"
 `;
 
+const submissionListColumns = `
+  submissions.id::text AS id,
+  submissions.user_id::text AS "userId",
+  submissions.seller_name AS "sellerName",
+  submissions.seller_phone AS "sellerPhone",
+  submissions.brand,
+  submissions.model,
+  submissions.year,
+  submissions.transmission,
+  submissions.fuel_type AS "fuelType",
+  submissions.color,
+  submissions.body_type AS "bodyType",
+  submissions.mileage,
+  submissions.expected_price::text AS "expectedPrice",
+  submissions.image_url AS "imageUrl",
+  CASE
+    WHEN cardinality(submissions.images) > 0 THEN submissions.images
+    WHEN submissions.image_url IS NOT NULL THEN ARRAY[submissions.image_url]
+    ELSE ARRAY[]::TEXT[]
+  END AS images,
+  submissions.location,
+  submissions.description,
+  submissions.status,
+  submissions.reviewed_by_email AS "reviewedByEmail",
+  COALESCE(submissions.reviewed_by_name, reviewer.name) AS "reviewedByName",
+  submissions.review_note AS "reviewNote",
+  submissions.reviewed_at AS "reviewedAt",
+  submissions.created_at AS "createdAt"
+`;
+
 async function updateReview(client, id, input) {
   const result = await client.query(
     `UPDATE submissions
-     SET status = $1, reviewed_by_email = $2, review_note = $3, reviewed_at = NOW()
-     WHERE id = $4
+     SET status = $1,
+         reviewed_by_email = $2,
+         reviewed_by_name = $3,
+         review_note = $4,
+         reviewed_at = NOW()
+     WHERE id = $5
      RETURNING id::text AS id, status,
                reviewed_by_email AS "reviewedByEmail",
+               reviewed_by_name AS "reviewedByName",
                review_note AS "reviewNote",
                reviewed_at AS "reviewedAt"`,
-    [input.status, input.reviewedByEmail, input.reviewNote ?? null, id],
+    [
+      input.status,
+      input.reviewedByEmail,
+      input.reviewedByName ?? null,
+      input.reviewNote ?? null,
+      id,
+    ],
   );
   return result.rows[0];
 }
@@ -90,7 +132,7 @@ export function createSubmissionsModel(pool) {
 
     async list({ status, limit, offset }) {
       const filters = status === 'all' ? [] : [status];
-      const whereClause = filters.length > 0 ? 'WHERE status = $1' : '';
+      const whereClause = filters.length > 0 ? 'WHERE submissions.status = $1' : '';
       const countResult = await pool.query(
         `SELECT COUNT(*)::text AS count FROM submissions ${whereClause}`,
         filters,
@@ -99,10 +141,12 @@ export function createSubmissionsModel(pool) {
       const limitParameter = filters.length + 1;
       const offsetParameter = filters.length + 2;
       const result = await pool.query(
-        `SELECT ${submissionColumns}
+        `SELECT ${submissionListColumns}
          FROM submissions
+         LEFT JOIN users AS reviewer
+           ON LOWER(reviewer.email) = LOWER(submissions.reviewed_by_email)
          ${whereClause}
-         ORDER BY created_at DESC, id DESC
+         ORDER BY submissions.created_at DESC, submissions.id DESC
          LIMIT $${limitParameter} OFFSET $${offsetParameter}`,
         pageValues,
       );

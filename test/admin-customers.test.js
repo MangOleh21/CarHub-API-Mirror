@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { createApp } from '../src/app.js';
 
 const origin = 'http://localhost:5173';
-const adminCookie = 'carhub_admin_session=admin-token';
+const adminCookie = 'carhub_user_session=admin-token';
 
 const sampleUser = {
   id: '12',

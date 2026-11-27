@@ -6,7 +6,7 @@ import { createApp } from '../src/app.js';
 import { createImageUploadService, maxImageSizeBytes } from '../src/services/image-upload.js';
 
 const origin = 'http://localhost:5173';
-const sessionCookie = 'carhub_admin_session=test-token';
+const sessionCookie = 'carhub_user_session=test-token';
 const uploadUrl = 'https://api.cloudinary.com/v1_1/carhub-demo/image/upload';
 const uploadFields = {
   api_key: 'public-key',

@@ -220,11 +220,18 @@ test('register rejects duplicate emails with 409 and login returns generic 401 o
   assert.equal(wrongPassword.body.error.code, 'INVALID_CREDENTIALS');
 });
 
-test('user and admin session cookies are strictly isolated from each other', async () => {
+test('regular user role is forbidden from admin endpoints while admin/owner can update profile without phone', async () => {
+  let updatedAdminProfile;
   const app = createApp(createModels(
     {
-      async getActiveSession() {
-        return { id: '20', name: 'User', email: 'u@example.test', phone: '0812345678', location: null };
+      async getActiveSession(tokenHash) {
+        return tokenHash
+          ? { id: '1', name: 'Owner', email: 'owner@example.test', phone: '', location: null, role: 'owner' }
+          : null;
+      },
+      async updateProfile(id, data) {
+        updatedAdminProfile = { id, ...data };
+        return { id, email: 'owner@example.test', role: 'owner', ...data };
       },
       async findByEmail() { return null; },
       async create() { return null; },
@@ -233,7 +240,7 @@ test('user and admin session cookies are strictly isolated from each other', asy
     },
     {
       async getActiveSession() {
-        return { id: '1', email: 'admin@example.test', role: 'admin' };
+        return { id: '20', name: 'Regular User', email: 'u@example.test', role: 'user' };
       },
       async findUserByEmail() { return null; },
       async createSession() {},
@@ -241,15 +248,27 @@ test('user and admin session cookies are strictly isolated from each other', asy
     },
   ));
 
-  const adminCookieOnUserRoute = await request(app, '/api/me', {
-    cookie: 'carhub_admin_session=admin-token',
-  });
-  assert.equal(adminCookieOnUserRoute.status, 401);
-
-  const userCookieOnAdminRoute = await request(app, '/api/admin/auth/session', {
+  const userOnAdminRoute = await request(app, '/api/admin/auth/session', {
     cookie: 'carhub_user_session=user-token',
   });
-  assert.equal(userCookieOnAdminRoute.status, 401);
+  assert.equal(userOnAdminRoute.status, 403);
+  assert.equal(userOnAdminRoute.body.error.code, 'FORBIDDEN');
+
+  const ownerProfileUpdate = await request(app, '/api/me', {
+    method: 'PATCH',
+    origin,
+    cookie: 'carhub_user_session=owner-token',
+    body: {
+      name: 'Owner CarHub',
+      phone: '',
+      location: 'Semarang',
+      newPassword: 'newownerpassword123',
+    },
+  });
+  assert.equal(ownerProfileUpdate.status, 200);
+  assert.equal(ownerProfileUpdate.body.data.user.role, 'owner');
+  assert.equal(updatedAdminProfile.name, 'Owner CarHub');
+  assert.ok(updatedAdminProfile.passwordHash);
 
   const untrustedRegister = await request(app, '/api/auth/register', {
     method: 'POST',

@@ -298,6 +298,103 @@ test('owner can deactivate an admin but the owner account cannot be deactivated'
   }
 });
 
+test('owner can update and delete an admin account while owner account remains protected', async () => {
+  const owner = {
+    id: '1',
+    email: 'owner@example.test',
+    role: 'owner',
+    isActive: true,
+    passwordHash: await hashPassword(loginPassword),
+  };
+  let updatedCall;
+  let deletedId;
+  const adminRepository = {
+    async findUserByEmail(email) {
+      return email === owner.email ? owner : null;
+    },
+    async createSession() {},
+    async getActiveSession() { return owner; },
+    async updateAdmin(id, input) {
+      updatedCall = { id, input };
+      if (id === '1') return { kind: 'not_found' };
+      if (input.email === 'taken@example.test') return { kind: 'email_exists' };
+      return {
+        kind: 'updated',
+        admin: { id, ...input, role: 'admin' },
+      };
+    },
+    async deleteAdmin(id) {
+      deletedId = id;
+      return id === '2' ? { id } : null;
+    },
+  };
+  const client = await createClient(createApp(createModels(adminRepository)));
+
+  try {
+    const cookie = await login(client);
+
+    const updated = await client.request('/api/admin/users/2', {
+      method: 'PUT',
+      origin,
+      cookie,
+      body: {
+        name: 'Moderator Baru',
+        email: 'Mod@Example.Test',
+        phone: '+6281234567890',
+        location: 'Semarang',
+        isActive: true,
+        password: 'a brand new admin password',
+      },
+    });
+    assert.equal(updated.status, 200);
+    assert.equal(updatedCall.id, '2');
+    assert.equal(updatedCall.input.email, 'mod@example.test');
+    assert.ok(updatedCall.input.passwordHash);
+    assert.equal(updated.body.data.admin.name, 'Moderator Baru');
+
+    const dupEmail = await client.request('/api/admin/users/2', {
+      method: 'PUT',
+      origin,
+      cookie,
+      body: {
+        name: 'Mod',
+        email: 'taken@example.test',
+        isActive: true,
+      },
+    });
+    assert.equal(dupEmail.status, 409);
+
+    const protectOwnerUpdate = await client.request('/api/admin/users/1', {
+      method: 'PUT',
+      origin,
+      cookie,
+      body: {
+        name: 'Owner',
+        email: 'owner@example.test',
+        isActive: false,
+      },
+    });
+    assert.equal(protectOwnerUpdate.status, 404);
+
+    const deleted = await client.request('/api/admin/users/2', {
+      method: 'DELETE',
+      origin,
+      cookie,
+    });
+    assert.equal(deleted.status, 204);
+    assert.equal(deletedId, '2');
+
+    const protectOwnerDelete = await client.request('/api/admin/users/1', {
+      method: 'DELETE',
+      origin,
+      cookie,
+    });
+    assert.equal(protectOwnerDelete.status, 404);
+  } finally {
+    await client.close();
+  }
+});
+
 test('admin model handles unique conflicts without targeting a case-sensitive constraint', async () => {
   let insertSql;
   const model = createAdminsModel({

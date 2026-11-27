@@ -4,6 +4,7 @@ const userPublicColumns = `
   email,
   phone,
   location,
+  role,
   is_active AS "isActive",
   created_at AS "createdAt"
 `;
@@ -21,24 +22,40 @@ export function createUsersModel(pool) {
       return result.rows[0] ?? null;
     },
 
-    async findById(id) {
-      const result = await pool.query(
-        `SELECT ${userPublicColumns}
-         FROM users
-         WHERE id = $1
-         LIMIT 1`,
-        [id],
-      );
+    async findById(id, { role = 'user' } = {}) {
+      const result = role
+        ? await pool.query(
+          `SELECT ${userPublicColumns}
+           FROM users
+           WHERE id = $1 AND role = $2
+           LIMIT 1`,
+          [id, role],
+        )
+        : await pool.query(
+          `SELECT ${userPublicColumns}
+           FROM users
+           WHERE id = $1
+           LIMIT 1`,
+          [id],
+        );
       return result.rows[0] ?? null;
     },
 
-    async create({ name, email, phone, location = null, passwordHash, isActive = true }) {
+    async create({
+      name,
+      email,
+      phone = '',
+      location = null,
+      role = 'user',
+      passwordHash,
+      isActive = true,
+    }) {
       const result = await pool.query(
-        `INSERT INTO users (name, email, phone, location, password_hash, is_active)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO users (name, email, phone, location, role, password_hash, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT DO NOTHING
          RETURNING ${userPublicColumns}`,
-        [name, email, phone, location, passwordHash, isActive],
+        [name, email, phone, location, role, passwordHash, isActive],
       );
       return result.rows[0] ?? null;
     },
@@ -67,9 +84,9 @@ export function createUsersModel(pool) {
       return result.rows[0] ?? null;
     },
 
-    async listUsers({ search, status = 'all', limit, offset }) {
-      const filters = [];
-      const values = [];
+    async listUsers({ search, status = 'all', role = 'user', limit, offset }) {
+      const filters = ['role = $1'];
+      const values = [role];
 
       if (search) {
         values.push(`%${search}%`);
@@ -84,7 +101,7 @@ export function createUsersModel(pool) {
         filters.push('is_active = FALSE');
       }
 
-      const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
+      const whereClause = `WHERE ${filters.join(' AND ')}`;
       const countResult = await pool.query(
         `SELECT COUNT(*)::text AS count FROM users ${whereClause}`,
         values,
@@ -114,7 +131,7 @@ export function createUsersModel(pool) {
                  location = $4,
                  is_active = $5,
                  password_hash = $6
-             WHERE id = $7
+             WHERE id = $7 AND role = 'user'
              RETURNING ${userPublicColumns}`,
             [name, email, phone, location ?? null, isActive, passwordHash, id],
           )
@@ -125,7 +142,7 @@ export function createUsersModel(pool) {
                  phone = $3,
                  location = $4,
                  is_active = $5
-             WHERE id = $6
+             WHERE id = $6 AND role = 'user'
              RETURNING ${userPublicColumns}`,
             [name, email, phone, location ?? null, isActive, id],
           );
@@ -156,7 +173,7 @@ export function createUsersModel(pool) {
     async deleteById(id) {
       const result = await pool.query(
         `DELETE FROM users
-         WHERE id = $1
+         WHERE id = $1 AND role = 'user'
          RETURNING id::text AS id`,
         [id],
       );
@@ -178,6 +195,7 @@ export function createUsersModel(pool) {
                 users.email,
                 users.phone,
                 users.location,
+                users.role,
                 users.created_at AS "createdAt"
          FROM user_sessions
          JOIN users ON users.id = user_sessions.user_id

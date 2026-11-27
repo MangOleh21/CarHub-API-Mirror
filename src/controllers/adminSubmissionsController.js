@@ -62,6 +62,7 @@ export function createAdminSubmissionsController(submissionModel) {
       ...parsedBody.data,
       status,
       reviewedByEmail: request.admin.email,
+      reviewedByName: request.admin.name ?? null,
       reviewNote: parsedBody.data.reviewNote ?? null,
     });
 

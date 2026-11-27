@@ -48,8 +48,9 @@ test('migration runner applies each numbered migration once in order', async () 
     '007_add_car_color_and_body_type',
     '008_add_users',
     '009_add_listing_owner',
+    '010_merge_admins_into_users',
   ]);
-  assert.equal(firstRunSqlCount, 9);
+  assert.equal(firstRunSqlCount, 10);
   assert.equal(appliedSql.length, firstRunSqlCount);
   assert.match(appliedSql[1], /ALTER TABLE submissions ADD COLUMN location/);
   assert.match(appliedSql[2], /ADD COLUMN reviewed_by_email/);
@@ -66,6 +67,9 @@ test('migration runner applies each numbered migration once in order', async () 
   assert.match(appliedSql[7], /CREATE TABLE IF NOT EXISTS user_sessions/);
   assert.match(appliedSql[8], /ALTER TABLE submissions\s+ADD COLUMN IF NOT EXISTS user_id BIGINT/);
   assert.match(appliedSql[8], /ALTER TABLE cars\s+ADD COLUMN IF NOT EXISTS user_id BIGINT/);
+  assert.match(appliedSql[9], /ADD COLUMN IF NOT EXISTS role VARCHAR\(20\)/);
+  assert.match(appliedSql[9], /DROP TABLE IF EXISTS admin_users/);
+  assert.match(appliedSql[9], /ADD COLUMN IF NOT EXISTS reviewed_by_name VARCHAR\(150\)/);
   for (const color of COLOR_OPTIONS) {
     assert.ok(appliedSql[6].includes(`'${color}'`), `Missing color ${color} in migration 007`);
   }

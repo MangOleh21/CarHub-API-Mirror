@@ -2,12 +2,13 @@
   "info": {
     "_postman_id": "d4a0c40b-f37c-4c8a-894e-15b3beae3cc8",
     "name": "CarHub API",
-    "description": "Collection API CarHub untuk local/development. Login admin memakai cookie HttpOnly yang dikelola cookie jar Postman. Upload foto memakai dua tahap: minta field bertanda tangan dari API, lalu POST file multipart langsung ke Cloudinary. Aset Cloudinary bersifat publik dan tidak dihapus collection; gunakan akun development.",
+    "description": "Collection API CarHub untuk local/development. Autentikasi user dan admin memakai satu cookie HttpOnly (carhub_user_session) yang dikelola cookie jar Postman. Upload foto memakai dua tahap: minta field bertanda tangan dari API, lalu POST file multipart langsung ke Cloudinary. Aset Cloudinary bersifat publik dan tidak dihapus collection; gunakan akun development.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
       "name": "Public API",
+      "description": "Endpoint publik katalog kendaraan dan signed upload pengajuan tanpa login.",
       "item": [
         {
           "name": "Health check",
@@ -52,11 +53,23 @@
               "path": ["api", "cars"],
               "query": [
                 { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "20" }
+                { "key": "pageSize", "value": "20" },
+                { "key": "search", "value": "Avanza", "disabled": true },
+                { "key": "brand", "value": "Toyota", "disabled": true },
+                { "key": "bodyType", "value": "SUV,MPV", "disabled": true },
+                { "key": "color", "value": "Putih", "disabled": true },
+                { "key": "fuelType", "value": "Bensin", "disabled": true },
+                { "key": "transmission", "value": "Automatic", "disabled": true },
+                { "key": "minPrice", "value": "100000000", "disabled": true },
+                { "key": "maxPrice", "value": "300000000", "disabled": true },
+                { "key": "minYear", "value": "2018", "disabled": true },
+                { "key": "maxYear", "value": "2026", "disabled": true },
+                { "key": "sortBy", "value": "createdAt", "disabled": true },
+                { "key": "sortOrder", "value": "desc", "disabled": true }
               ]
-            }
+            },
+            "description": "Mengisi collection variable carId dengan ID mobil pertama jika katalog tidak kosong. Aktifkan query parameter opsional untuk menguji filter katalog."
           },
-          "description": "Mengisi collection variable carId dengan ID mobil pertama jika katalog tidak kosong.",
           "event": [
             {
               "listen": "test",
@@ -79,6 +92,37 @@
           ]
         },
         {
+          "name": "List car brands",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/cars/brands",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "cars", "brands"]
+            },
+            "description": "Mengambil daftar merek unik dari katalog mobil aktif."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns available car brands', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Get car detail",
           "request": {
             "method": "GET",
@@ -89,9 +133,9 @@
               "host": ["{{apiHost}}"],
               "port": "{{apiPort}}",
               "path": ["api", "cars", "{{carId}}"]
-            }
+            },
+            "description": "Memakai ID pertama dari request List cars. Jika katalog kosong, respons 404 tetap diterima."
           },
-          "description": "Memakai ID pertama dari request List cars. Jika katalog kosong, respons 404 tetap diterima.",
           "event": [
             {
               "listen": "test",
@@ -107,56 +151,6 @@
                   "  } else {",
                   "    pm.expect(body.error.code).to.eql('NOT_FOUND');",
                   "  }",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Create car submission",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Origin",
-                "value": "{{frontendOrigin}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"sellerName\": \"Postman Tester\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"fuelType\": \"Bensin\",\n  \"color\": \"Putih\",\n  \"bodyType\": \"MPV\",\n  \"mileage\": 25000,\n  \"expectedPrice\": 180000000,\n  \"location\": \"Jakarta\",\n  \"imageUrl\": \"https://images.example.test/carhub-postman-test.jpg\",\n  \"description\": \"Submission uji dari Postman; hapus atau moderasi data ini setelah pengujian.\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "http://{{apiHost}}:{{apiPort}}/api/submissions",
-              "protocol": "http",
-              "host": ["{{apiHost}}"],
-              "port": "{{apiPort}}",
-              "path": ["api", "submissions"]
-            },
-            "description": "Request ini menambahkan data submission berstatus pending ke database. Gunakan hanya pada local/dev."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('creates a pending submission', function () {",
-                  "  pm.response.to.have.status(201);",
-                  "  const body = pm.response.json();",
-                  "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.data.status).to.eql('pending');",
-                  "  pm.collectionVariables.set('submissionId', String(body.data.id));",
                   "});"
                 ]
               }
@@ -186,9 +180,9 @@
               "host": ["{{apiHost}}"],
               "port": "{{apiPort}}",
               "path": ["api", "uploads", "submissions"]
-            }
+            },
+            "description": "Tahap 1: minta URL dan field signed upload Cloudinary untuk foto pengajuan. Atur uploadContentType dan uploadFileSizeBytes sesuai file. Gunakan hanya environment local/development."
           },
-          "description": "Tahap 1: minta URL dan field signed upload. Atur uploadContentType dan uploadFileSizeBytes sesuai file. Ukuran dikirim oleh klien dan bukan batas keras provider. Gunakan hanya environment local/development.",
           "event": [
             {
               "listen": "test",
@@ -229,9 +223,9 @@
                 { "key": "upload_preset", "value": "{{submissionUpload_upload_preset}}", "type": "text" }
               ]
             },
-            "url": "{{submissionUploadUrl}}"
+            "url": "{{submissionUploadUrl}}",
+            "description": "Tahap 2: pada Body > form-data, pilih file yang sama dengan request tahap 1. Upload dikirim langsung ke Cloudinary. File yang berhasil diunggah bersifat publik dan collection tidak menghapusnya."
           },
-          "description": "Tahap 2: pada Body > form-data, pilih file yang sama dengan request tahap 1. Upload dikirim langsung ke Cloudinary. File yang berhasil diunggah bersifat publik dan collection tidak menghapusnya. Gunakan akun local/development.",
           "event": [
             {
               "listen": "test",
@@ -258,7 +252,8 @@
       ]
     },
     {
-      "name": "User auth & profile",
+      "name": "User auth, profile & submissions",
+      "description": "Isi userEmail dan userPassword pada environment. Login atau register menetapkan cookie carhub_user_session untuk endpoint profil, pengajuan jual mobil, dan daftar mobil saya.",
       "item": [
         {
           "name": "User register",
@@ -279,8 +274,28 @@
               "host": ["{{apiHost}}"],
               "port": "{{apiPort}}",
               "path": ["api", "auth", "register"]
+            },
+            "description": "Mendaftarkan akun pengguna baru (role user) dan langsung menetapkan sesi cookie."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('registers a new user or reports existing email', function () {",
+                  "  pm.expect([201, 409]).to.include(pm.response.code);",
+                  "  if (pm.response.code === 201) {",
+                  "    const user = pm.response.json().data.user;",
+                  "    pm.expect(user).to.have.property('id');",
+                  "    pm.expect(user.role).to.eql('user');",
+                  "    pm.expect(user).not.to.have.property('passwordHash');",
+                  "  }",
+                  "});"
+                ]
+              }
             }
-          }
+          ]
         },
         {
           "name": "User login",
@@ -301,8 +316,57 @@
               "host": ["{{apiHost}}"],
               "port": "{{apiPort}}",
               "path": ["api", "auth", "login"]
+            },
+            "description": "Login akun CarHub (role user, admin, atau owner) dengan cookie carhub_user_session."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('user login succeeds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const user = pm.response.json().data.user;",
+                  "  pm.expect(user).to.have.property('id');",
+                  "  pm.expect(user).to.have.property('role');",
+                  "  pm.expect(user).not.to.have.property('passwordHash');",
+                  "});"
+                ]
+              }
             }
-          }
+          ]
+        },
+        {
+          "name": "Get current user session",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/auth/session",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "auth", "session"]
+            },
+            "description": "Memeriksa sesi pengguna aktif dari cookie carhub_user_session."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns active user session', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const user = pm.response.json().data.user;",
+                  "  pm.expect(user).to.have.property('id');",
+                  "  pm.expect(user).to.have.property('role');",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Get current user profile",
@@ -315,8 +379,107 @@
               "host": ["{{apiHost}}"],
               "port": "{{apiPort}}",
               "path": ["api", "me"]
+            },
+            "description": "Mengambil data profil pengguna yang sedang login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns current user profile', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const user = pm.response.json().data.user;",
+                  "  pm.expect(user).to.include.all.keys('id', 'name', 'email', 'phone', 'location', 'role');",
+                  "});"
+                ]
+              }
             }
-          }
+          ]
+        },
+        {
+          "name": "Update current user profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Seller Updated\",\n  \"phone\": \"+6281234567890\",\n  \"location\": \"Jakarta\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/me",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "me"]
+            },
+            "description": "Memperbarui profil akun aktif (berlaku untuk user, admin, dan owner). Tambahkan field opsional \"newPassword\" (min. 8 karakter) jika ingin mengganti kata sandi."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('updates current user profile', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const user = pm.response.json().data.user;",
+                  "  pm.expect(user.name).to.eql('Postman Seller Updated');",
+                  "  pm.expect(user.location).to.eql('Jakarta');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create car submission",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sellerName\": \"Postman Seller\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"fuelType\": \"Bensin\",\n  \"color\": \"Putih\",\n  \"bodyType\": \"MPV\",\n  \"mileage\": 25000,\n  \"expectedPrice\": 180000000,\n  \"location\": \"Jakarta\",\n  \"images\": [\n    \"https://images.example.test/carhub-postman-test.jpg\"\n  ],\n  \"description\": \"Submission uji dari Postman; hapus atau moderasi data ini setelah pengujian.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/submissions",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "submissions"]
+            },
+            "description": "Memerlukan sesi login (cookie carhub_user_session). Menambahkan submission berstatus pending yang terhubung ke user aktif dan mengisi collection variable submissionId."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('creates a pending submission', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.status).to.eql('pending');",
+                  "  pm.collectionVariables.set('submissionId', String(body.data.id));",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "List my listings",
@@ -334,8 +497,26 @@
                 { "key": "page", "value": "1" },
                 { "key": "pageSize", "value": "10" }
               ]
+            },
+            "description": "Mengambil daftar mobil tayang dan pengajuan milik user aktif. Filter status: all, active, pending, atau rejected."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns paginated user listings', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "  pm.expect(body.pagination).to.include.all.keys('page', 'pageSize', 'totalItems', 'totalPages');",
+                  "});"
+                ]
+              }
             }
-          }
+          ]
         },
         {
           "name": "User logout",
@@ -357,27 +538,34 @@
               "port": "{{apiPort}}",
               "path": ["api", "auth", "logout"]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('user logout clears the session', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
       "name": "Admin auth",
-      "description": "Isi adminEmail dan adminPassword pada environment. Login menetapkan cookie HttpOnly; Postman menyimpannya pada cookie jar untuk host API.",
+      "description": "Isi adminEmail dan adminPassword pada environment (gunakan akun owner agar folder Admin users juga dapat dijalankan). Login menetapkan cookie HttpOnly carhub_user_session.",
       "item": [
         {
           "name": "Admin login",
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Origin",
-                "value": "{{frontendOrigin}}"
-              }
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
             ],
             "body": {
               "mode": "raw",
@@ -446,26 +634,233 @@
       ]
     },
     {
-      "name": "Admin users (owner only)",
-      "description": "Set newAdminEmail dan newAdminPassword pada environment. Buat akun sebelum menonaktifkannya agar createdAdminId terisi.",
+      "name": "Admin customers (CRUD)",
+      "description": "Kelola akun pengguna publik (role user). Dapat diakses oleh admin maupun owner. Isi newCustomerEmail dan newCustomerPassword pada environment sebelum menjalankan Create customer.",
       "item": [
+        {
+          "name": "List customers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/customers?status=all&page=1&pageSize=20",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "customers"],
+              "query": [
+                { "key": "search", "value": "", "disabled": true },
+                { "key": "status", "value": "all" },
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            },
+            "description": "Daftar pengguna publik terpaginasikan. Filter status: all, active, atau inactive."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns paginated customer list', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "  pm.expect(body.pagination).to.include.all.keys('page', 'pageSize', 'totalItems', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Siti Aminah\",\n  \"email\": \"{{newCustomerEmail}}\",\n  \"phone\": \"+6281234567890\",\n  \"location\": \"Bandung\",\n  \"password\": \"{{newCustomerPassword}}\",\n  \"isActive\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/customers",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "customers"]
+            },
+            "description": "Membuat akun pengguna publik baru dan mengisi collection variable customerId."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('creates a customer account', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const customer = pm.response.json().data;",
+                  "  pm.expect(customer).to.have.property('id');",
+                  "  pm.expect(customer.isActive).to.eql(true);",
+                  "  pm.expect(customer).not.to.have.property('passwordHash');",
+                  "  pm.collectionVariables.set('customerId', String(customer.id));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get customer detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/customers/{{customerId}}",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "customers", "{{customerId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns customer detail', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get('customerId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update customer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Siti Aminah Updated\",\n  \"email\": \"{{newCustomerEmail}}\",\n  \"phone\": \"+6281234567891\",\n  \"location\": \"Jakarta\",\n  \"isActive\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/customers/{{customerId}}",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "customers", "{{customerId}}"]
+            },
+            "description": "Memperbarui profil dan status aktif pengguna. Tambahkan field opsional \"password\" (min. 8 karakter) untuk reset kata sandi."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('updates the customer account', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const customer = pm.response.json().data;",
+                  "  pm.expect(customer.name).to.eql('Siti Aminah Updated');",
+                  "  pm.expect(customer.isActive).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete customer",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/customers/{{customerId}}",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "customers", "{{customerId}}"]
+            },
+            "description": "Menghapus permanen akun pengguna uji. Listing mobil dan pengajuan lama tetap dipertahankan dengan user_id NULL."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('deletes the customer account', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin users (owner only)",
+      "description": "Khusus owner. Set newAdminEmail dan newAdminPassword (min. 12 karakter) pada environment. Akun owner dilindungi dari ubah/nonaktifkan/hapus.",
+      "item": [
+        {
+          "name": "List admin users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/users",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "users"]
+            },
+            "description": "Mengambil daftar akun owner dan admin beserta status aktif dan metadata kontak."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns admin accounts list', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
         {
           "name": "Create admin",
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Origin",
-                "value": "{{frontendOrigin}}"
-              }
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{newAdminEmail}}\",\n  \"password\": \"{{newAdminPassword}}\"\n}",
+              "raw": "{\n  \"name\": \"Admin Operasional\",\n  \"email\": \"{{newAdminEmail}}\",\n  \"phone\": \"+6281234567892\",\n  \"location\": \"Semarang\",\n  \"isActive\": true,\n  \"password\": \"{{newAdminPassword}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -478,7 +873,8 @@
               "host": ["{{apiHost}}"],
               "port": "{{apiPort}}",
               "path": ["api", "admin", "users"]
-            }
+            },
+            "description": "Membuat akun ber-role admin (password minimal 12 karakter) dan menyimpan ID ke createdAdminId."
           },
           "event": [
             {
@@ -500,14 +896,54 @@
           ]
         },
         {
+          "name": "Update created admin",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Admin Operasional Updated\",\n  \"email\": \"{{newAdminEmail}}\",\n  \"phone\": \"+6281234567893\",\n  \"location\": \"Jakarta\",\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/users/{{createdAdminId}}",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "users", "{{createdAdminId}}"]
+            },
+            "description": "Memperbarui profil, status aktif, atau reset password opsional (\"password\" min. 12 karakter) akun admin. Akun owner tidak dapat diubah."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('updates the created admin', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const admin = pm.response.json().data.admin;",
+                  "  pm.expect(admin.role).to.eql('admin');",
+                  "  pm.expect(admin.name).to.eql('Admin Operasional Updated');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Deactivate created admin",
           "request": {
             "method": "PATCH",
             "header": [
-              {
-                "key": "Origin",
-                "value": "{{frontendOrigin}}"
-              }
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
             ],
             "url": {
               "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/users/{{createdAdminId}}/deactivate",
@@ -515,7 +951,8 @@
               "host": ["{{apiHost}}"],
               "port": "{{apiPort}}",
               "path": ["api", "admin", "users", "{{createdAdminId}}", "deactivate"]
-            }
+            },
+            "description": "Menonaktifkan akun admin aktif dan mencabut seluruh sesi aktifnya."
           },
           "event": [
             {
@@ -533,15 +970,45 @@
               }
             }
           ]
+        },
+        {
+          "name": "Delete created admin",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/users/{{createdAdminId}}",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "users", "{{createdAdminId}}"]
+            },
+            "description": "Menghapus permanen akun admin uji. Akun owner tidak dapat dihapus."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('deletes the created admin', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
       "name": "Admin submissions",
-      "description": "Login admin terlebih dahulu. Buat submission lewat Public API agar submissionId terisi, lalu gunakan approval satu kali.",
+      "description": "Login admin terlebih dahulu. Buat submission lewat folder User auth, profile & submissions agar submissionId terisi, lalu pilih Approve atau Reject satu kali.",
       "item": [
         {
-          "name": "List pending submissions",
+          "name": "List submissions",
           "request": {
             "method": "GET",
             "header": [],
@@ -556,7 +1023,8 @@
                 { "key": "page", "value": "1" },
                 { "key": "pageSize", "value": "20" }
               ]
-            }
+            },
+            "description": "Daftar pengajuan jual mobil terpaginasikan. Nilai status: pending, approved, rejected, atau all."
           },
           "event": [
             {
@@ -564,7 +1032,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('returns a paginated pending submission list', function () {",
+                  "pm.test('returns a paginated submission list', function () {",
                   "  pm.response.to.have.status(200);",
                   "  const body = pm.response.json();",
                   "  pm.expect(body.success).to.eql(true);",
@@ -581,18 +1049,12 @@
           "request": {
             "method": "PATCH",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Origin",
-                "value": "{{frontendOrigin}}"
-              }
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"location\": \"Jakarta\",\n  \"imageUrl\": \"https://images.example.test/carhub-postman-test.jpg\",\n  \"reviewNote\": \"Data kendaraan telah diperiksa.\"\n}",
+              "raw": "{\n  \"location\": \"Jakarta\",\n  \"color\": \"Putih\",\n  \"bodyType\": \"MPV\",\n  \"images\": [\n    \"https://images.example.test/carhub-postman-test.jpg\"\n  ],\n  \"reviewNote\": \"Data kendaraan telah diperiksa.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -606,7 +1068,7 @@
               "port": "{{apiPort}}",
               "path": ["api", "admin", "submissions", "{{submissionId}}", "approved"]
             },
-            "description": "Mengubah submission pending menjadi approved dan membuat mobil katalog. Email reviewer diambil dari sesi admin. Untuk menolak, gunakan /rejected dan kirim reviewNote opsional. Jalankan hanya sekali untuk submissionId yang dipilih."
+            "description": "Mengubah submission pending menjadi approved dan membuat mobil katalog. Nama dan email reviewer otomatis diambil dari sesi admin. Jalankan hanya sekali untuk submissionId yang dipilih."
           },
           "event": [
             {
@@ -627,12 +1089,56 @@
               }
             }
           ]
+        },
+        {
+          "name": "Reject submission",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reviewNote\": \"Foto kendaraan belum lengkap, silakan ajukan ulang.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/submissions/{{submissionId}}/rejected",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "submissions", "{{submissionId}}", "rejected"]
+            },
+            "description": "Menolak submission berstatus pending tanpa membuat data mobil katalog. Gunakan pada submissionId lain yang masih berstatus pending."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rejects a pending submission', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.submission.status).to.eql('rejected');",
+                  "  pm.expect(body.data.car).to.eql(null);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
       "name": "Admin cars",
-      "description": "CRUD mobil oleh admin. Create, update, dan delete memakai adminCarId; delete adalah hard delete dan menghapus mobil uji yang dibuat oleh folder ini.",
+      "description": "CRUD, upload foto, arsip, pemulihan, dan hapus permanen mobil oleh admin. Create mengisi adminCarId.",
       "item": [
         {
           "name": "List admin cars",
@@ -640,16 +1146,26 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/cars?page=1&pageSize=20",
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/cars?archiveStatus=active&page=1&pageSize=20",
               "protocol": "http",
               "host": ["{{apiHost}}"],
               "port": "{{apiPort}}",
               "path": ["api", "admin", "cars"],
               "query": [
+                { "key": "archiveStatus", "value": "active" },
                 { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "20" }
+                { "key": "pageSize", "value": "20" },
+                { "key": "search", "value": "", "disabled": true },
+                { "key": "brand", "value": "Toyota", "disabled": true },
+                { "key": "bodyType", "value": "MPV", "disabled": true },
+                { "key": "color", "value": "Putih", "disabled": true },
+                { "key": "fuelType", "value": "Bensin", "disabled": true },
+                { "key": "transmission", "value": "Automatic", "disabled": true },
+                { "key": "sortBy", "value": "createdAt", "disabled": true },
+                { "key": "sortOrder", "value": "desc", "disabled": true }
               ]
-            }
+            },
+            "description": "Mendukung seluruh filter katalog publik ditambah archiveStatus=active atau archiveStatus=archived."
           },
           "event": [
             {
@@ -670,6 +1186,94 @@
           ]
         },
         {
+          "name": "Request admin car image upload URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contentType\": \"{{uploadContentType}}\",\n  \"size\": {{uploadFileSizeBytes}}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/uploads/cars",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "uploads", "cars"]
+            },
+            "description": "Tahap 1: minta URL dan field signed upload Cloudinary untuk foto katalog mobil (folder carhub/cars)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns signed upload URL and fields for admin car', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.uploadUrl).to.be.a('string');",
+                  "  pm.environment.set('carUploadUrl', body.data.uploadUrl);",
+                  "  Object.entries(body.data.uploadFields).forEach(([key, value]) => {",
+                  "    pm.environment.set('carUpload_' + key, String(value));",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload admin car image to Cloudinary",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": null },
+                { "key": "api_key", "value": "{{carUpload_api_key}}", "type": "text" },
+                { "key": "asset_folder", "value": "{{carUpload_asset_folder}}", "type": "text" },
+                { "key": "allowed_formats", "value": "{{carUpload_allowed_formats}}", "type": "text" },
+                { "key": "overwrite", "value": "{{carUpload_overwrite}}", "type": "text" },
+                { "key": "public_id", "value": "{{carUpload_public_id}}", "type": "text" },
+                { "key": "signature", "value": "{{carUpload_signature}}", "type": "text" },
+                { "key": "timestamp", "value": "{{carUpload_timestamp}}", "type": "text" },
+                { "key": "upload_preset", "value": "{{carUpload_upload_preset}}", "type": "text" }
+              ]
+            },
+            "url": "{{carUploadUrl}}",
+            "description": "Tahap 2: pilih file pada Body > form-data lalu kirim langsung ke Cloudinary. URL hasil upload disimpan ke environment variable carImageUrl."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('uploads admin car image to Cloudinary', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.secure_url).to.be.a('string');",
+                  "  pm.environment.set('carImageUrl', body.secure_url);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.environment.unset('carUploadUrl');",
+                  "  ['api_key', 'asset_folder', 'allowed_formats', 'overwrite', 'public_id', 'signature', 'timestamp', 'upload_preset'].forEach((key) => {",
+                  "    pm.environment.unset('carUpload_' + key);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Create admin car",
           "request": {
             "method": "POST",
@@ -679,7 +1283,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"fuelType\": \"Bensin\",\n  \"color\": \"Putih\",\n  \"bodyType\": \"MPV\",\n  \"mileage\": 25000,\n  \"price\": 180000000,\n  \"imageUrl\": \"https://images.example.test/carhub-admin-test.jpg\",\n  \"sellerName\": \"Admin Test\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"location\": \"Jakarta\",\n  \"description\": \"Data uji CRUD admin\"\n}",
+              "raw": "{\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"fuelType\": \"Bensin\",\n  \"color\": \"Putih\",\n  \"bodyType\": \"MPV\",\n  \"mileage\": 25000,\n  \"price\": 180000000,\n  \"images\": [\n    \"https://images.example.test/carhub-admin-test.jpg\"\n  ],\n  \"sellerName\": \"Admin Test\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"location\": \"Jakarta\",\n  \"description\": \"Data uji CRUD admin\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -749,7 +1353,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza Veloz\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"fuelType\": \"Bensin\",\n  \"color\": \"Hitam\",\n  \"bodyType\": \"MPV\",\n  \"mileage\": 25000,\n  \"price\": 185000000,\n  \"imageUrl\": \"https://images.example.test/carhub-admin-test.jpg\",\n  \"sellerName\": \"Admin Test\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"location\": \"Jakarta\",\n  \"description\": \"Data uji CRUD admin; sudah diperbarui\"\n}",
+              "raw": "{\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza Veloz\",\n  \"year\": 2020,\n  \"transmission\": \"Automatic\",\n  \"fuelType\": \"Bensin\",\n  \"color\": \"Hitam\",\n  \"bodyType\": \"MPV\",\n  \"mileage\": 25000,\n  \"price\": 185000000,\n  \"images\": [\n    \"https://images.example.test/carhub-admin-test.jpg\"\n  ],\n  \"sellerName\": \"Admin Test\",\n  \"sellerPhone\": \"+6281234567890\",\n  \"location\": \"Jakarta\",\n  \"description\": \"Data uji CRUD admin; sudah diperbarui\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -780,7 +1384,7 @@
           ]
         },
         {
-          "name": "Delete admin car",
+          "name": "Archive admin car",
           "request": {
             "method": "DELETE",
             "header": [
@@ -793,7 +1397,7 @@
               "port": "{{apiPort}}",
               "path": ["api", "admin", "cars", "{{adminCarId}}"]
             },
-            "description": "Hard delete permanen mobil uji yang dibuat oleh request Create admin car."
+            "description": "Soft delete: mengarsipkan mobil dari katalog publik tanpa menghapus datanya secara permanen."
           },
           "event": [
             {
@@ -801,9 +1405,69 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('hard-deletes the admin car', function () {",
+                  "pm.test('archives the admin car', function () {",
                   "  pm.response.to.have.status(204);",
-                "});"
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Restore archived admin car",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/cars/{{adminCarId}}/restore",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "cars", "{{adminCarId}}", "restore"]
+            },
+            "description": "Memulihkan mobil yang sedang diarsipkan kembali ke katalog aktif."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('restores the archived admin car', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Permanently delete archived admin car",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "url": {
+              "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/cars/{{adminCarId}}/permanent",
+              "protocol": "http",
+              "host": ["{{apiHost}}"],
+              "port": "{{apiPort}}",
+              "path": ["api", "admin", "cars", "{{adminCarId}}", "permanent"]
+            },
+            "description": "Hard delete permanen untuk mobil yang sudah diarsipkan. Pastikan menjalankan Archive admin car terlebih dahulu sebelum request ini."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('permanently deletes the archived admin car', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
                 ]
               }
             }
@@ -816,10 +1480,7 @@
       "request": {
         "method": "POST",
         "header": [
-          {
-            "key": "Origin",
-            "value": "{{frontendOrigin}}"
-          }
+          { "key": "Origin", "value": "{{frontendOrigin}}" }
         ],
         "url": {
           "raw": "http://{{apiHost}}:{{apiPort}}/api/admin/auth/logout",
@@ -872,6 +1533,11 @@
     },
     {
       "key": "adminCarId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customerId",
       "value": "",
       "type": "string"
     },

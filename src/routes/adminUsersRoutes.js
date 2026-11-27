@@ -23,6 +23,20 @@ export function registerAdminUsersRoutes(app, { adminModel, allowedOrigins }) {
     requireOwner,
     controller.create,
   );
+  app.put(
+    '/api/admin/users/:id',
+    requireTrustedOrigin,
+    requireAdmin,
+    requireOwner,
+    controller.update,
+  );
+  app.delete(
+    '/api/admin/users/:id',
+    requireTrustedOrigin,
+    requireAdmin,
+    requireOwner,
+    controller.remove,
+  );
   app.patch(
     '/api/admin/users/:id/deactivate',
     requireTrustedOrigin,

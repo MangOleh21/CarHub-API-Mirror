@@ -3,14 +3,16 @@ import { hashPassword, verifyPassword } from '../auth/password.js';
 import {
   createSessionToken,
   getSessionCookieOptions,
+  getUserSessionCookieOptions,
   hashSessionToken,
   sessionCookieName,
-  sessionDurationMs,
+  userSessionCookieName,
+  userSessionDurationMs,
 } from '../auth/session-cookie.js';
 
 const loginSchema = z.object({
   email: z.string().trim().email().max(254),
-  password: z.string().min(12).max(128),
+  password: z.string().min(8).max(128),
 }).strict();
 
 const dummyPasswordHash = await hashPassword('not-a-real-admin-password');
@@ -28,6 +30,7 @@ function validationError(response, error) {
 function safeAdmin(admin) {
   return {
     id: admin.id,
+    ...(admin.name ? { name: admin.name } : {}),
     email: admin.email,
     role: admin.role,
   };
@@ -43,12 +46,13 @@ export function createAdminAuthController(adminModel) {
 
       const email = parsed.data.email.toLowerCase();
       const admin = await adminModel.findUserByEmail(email);
+      const isAdminRole = admin?.role === 'admin' || admin?.role === 'owner';
       const passwordMatches = await verifyPassword(
         parsed.data.password,
         admin?.passwordHash ?? dummyPasswordHash,
       );
 
-      if (!admin || !admin.isActive || !passwordMatches) {
+      if (!admin || !admin.isActive || !isAdminRole || !passwordMatches) {
         return response.status(401).json({
           error: {
             code: 'INVALID_CREDENTIALS',
@@ -60,11 +64,12 @@ export function createAdminAuthController(adminModel) {
       const token = createSessionToken();
       await adminModel.createSession({
         adminUserId: admin.id,
+        userId: admin.id,
         tokenHash: hashSessionToken(token),
-        expiresAt: new Date(Date.now() + sessionDurationMs),
+        expiresAt: new Date(Date.now() + userSessionDurationMs),
       });
 
-      response.cookie(sessionCookieName, token, getSessionCookieOptions());
+      response.cookie(userSessionCookieName, token, getUserSessionCookieOptions());
       return response.status(200).json({
         success: true,
         data: { admin: safeAdmin(admin) },
@@ -79,11 +84,12 @@ export function createAdminAuthController(adminModel) {
     },
 
     logout: async (request, response) => {
-      const token = request.cookies[sessionCookieName];
+      const token = request.cookies[userSessionCookieName] ?? request.cookies[sessionCookieName];
       if (token) {
         await adminModel.revokeSession(hashSessionToken(token));
       }
 
+      response.clearCookie(userSessionCookieName, getUserSessionCookieOptions());
       response.clearCookie(sessionCookieName, getSessionCookieOptions());
       return response.status(204).end();
     },

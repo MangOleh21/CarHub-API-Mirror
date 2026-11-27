@@ -53,8 +53,10 @@ async function main() {
   }
 
   const prompt = createInterface({ input: stdin, output: stdout });
+  let name;
   let email;
   try {
+    name = (await prompt.question('Owner full name (optional): ')).trim();
     email = await prompt.question('Owner email: ');
   } finally {
     prompt.close();
@@ -68,7 +70,11 @@ async function main() {
 
   const pool = createPool();
   try {
-    const owner = await bootstrapOwner(createAdminsModel(pool), { email, password });
+    const owner = await bootstrapOwner(createAdminsModel(pool), {
+      ...(name ? { name } : {}),
+      email,
+      password,
+    });
     console.log(`Created initial owner account ${owner.email} (id ${owner.id}).`);
   } catch (error) {
     if (error instanceof BootstrapOwnerError) {

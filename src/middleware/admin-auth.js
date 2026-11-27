@@ -1,4 +1,4 @@
-import { hashSessionToken, sessionCookieName } from '../auth/session-cookie.js';
+import { hashSessionToken, userSessionCookieName } from '../auth/session-cookie.js';
 
 function unauthorized(response) {
   return response.status(401).json({
@@ -9,31 +9,39 @@ function unauthorized(response) {
   });
 }
 
+function forbidden(response, message = 'Admin permission is required') {
+  return response.status(403).json({
+    error: {
+      code: 'FORBIDDEN',
+      message,
+    },
+  });
+}
+
 export function createRequireAdmin(adminModel) {
   return async (request, response, next) => {
-    const token = request.cookies[sessionCookieName];
+    const token = request.cookies[userSessionCookieName];
     if (!token) {
       return unauthorized(response);
     }
 
-    const admin = await adminModel.getActiveSession(hashSessionToken(token));
-    if (!admin) {
+    const account = await adminModel.getActiveSession(hashSessionToken(token));
+    if (!account) {
       return unauthorized(response);
     }
 
-    request.admin = admin;
+    if (account.role !== 'admin' && account.role !== 'owner') {
+      return forbidden(response);
+    }
+
+    request.admin = account;
     return next();
   };
 }
 
 export function requireOwner(request, response, next) {
   if (request.admin?.role !== 'owner') {
-    return response.status(403).json({
-      error: {
-        code: 'FORBIDDEN',
-        message: 'Owner permission is required',
-      },
-    });
+    return forbidden(response, 'Owner permission is required');
   }
 
   return next();

@@ -9,6 +9,10 @@ import {
 } from '../auth/session-cookie.js';
 
 const phoneSchema = z.string().trim().regex(/^\+?[0-9][0-9\s()-]{7,19}$/);
+const optionalProfilePhoneSchema = z.string().trim().refine(
+  (value) => value === '' || /^\+?[0-9][0-9\s()-]{7,19}$/.test(value),
+  { message: 'Invalid phone number' },
+);
 const optionalLocationSchema = z.string().trim().max(150).nullable().optional()
   .transform((value) => (value && value.length > 0 ? value : null));
 
@@ -27,7 +31,7 @@ const loginSchema = z.object({
 
 const updateProfileSchema = z.object({
   name: z.string().trim().min(1).max(150),
-  phone: phoneSchema,
+  phone: optionalProfilePhoneSchema,
   location: optionalLocationSchema,
   newPassword: z.string().min(8).max(128).optional(),
 }).strict();
@@ -55,8 +59,9 @@ function safeUser(user) {
     id: user.id,
     name: user.name,
     email: user.email,
-    phone: user.phone,
+    phone: user.phone ?? '',
     location: user.location ?? null,
+    role: user.role ?? 'user',
     ...(user.createdAt ? { createdAt: user.createdAt } : {}),
   };
 }
@@ -166,6 +171,17 @@ export function createUserAuthController(userModel) {
       const parsed = updateProfileSchema.safeParse(request.body);
       if (!parsed.success) {
         return validationError(response, parsed.error, 'Invalid profile data');
+      }
+
+      const isAdminRole = request.user.role === 'admin' || request.user.role === 'owner';
+      if (!isAdminRole && !parsed.data.phone) {
+        return response.status(422).json({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid profile data',
+            details: { phone: ['Phone number is required'] },
+          },
+        });
       }
 
       const passwordHash = parsed.data.newPassword

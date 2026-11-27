@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { createApp } from '../src/app.js';
 
 const origin = 'http://localhost:5173';
-const sessionCookie = 'carhub_admin_session=test-token';
+const sessionCookie = 'carhub_user_session=test-token';
 const carInput = {
   brand: 'Toyota',
   model: 'Avanza',
